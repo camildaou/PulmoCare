@@ -1,7 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect, ChangeEvent, FormEvent } from "react"
-
+import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,8 +8,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
+import Image from "next/image"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Stethoscope } from "lucide-react"
+import { doctorApi } from "@/lib/api"
+import { toast } from "@/hooks/use-toast"
 
 export default function DoctorSignUpPage() {
   const router = useRouter()
@@ -31,9 +34,9 @@ export default function DoctorSignUpPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
-
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(false)
   const [passwordConditions, setPasswordConditions] = useState({
     length: false,
     uppercase: false,
@@ -69,15 +72,15 @@ export default function DoctorSignUpPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev: typeof formData) => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev: typeof formData) => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleCheckboxChange = (checked: boolean) => {
-    setFormData((prev: typeof formData) => ({ ...prev, agreeToTerms: checked }))
+    setFormData((prev) => ({ ...prev, agreeToTerms: checked }))
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,60 +166,66 @@ export default function DoctorSignUpPage() {
 
     // Check terms agreement
     if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = "You must agree to the terms and policies"
+      newErrors.agreeToTerms = "You must agree to the terms and conditions"
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
 
     if (validateForm()) {
-      // In a real app, you would send this data to your backend
-      console.log("Form submitted:", formData)
-
-      // Format phone with country code for display
-      const formattedPhone = `${formData.countryCode} ${formData.phone}`
-
-      // Store user info in localStorage for demo purposes
-      localStorage.setItem(
-        "pulmocare_user",
-        JSON.stringify({
+      try {
+        const doctorData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           email: formData.email,
-          name: `${formData.firstName} ${formData.lastName}`,
-          type: "doctor",
-        }),
-      )
+          password: formData.password,
+          gender: formData.gender,
+          location: formData.address,
+          age: calculateAge(formData.dob),
+          phoneNumber: formData.countryCode + formData.phone,
+          medicalLicense: formData.license,
+          description: formData.about,
+        }
 
-      // Store complete profile data
-      const profileData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        gender: formData.gender,
-        age: calculateAge(formData.dob),
-        email: formData.email,
-        countryCode: formData.countryCode,
-        phone: formData.phone,
-        license: formData.license,
-        about: formData.about,
-        location: formData.address,
-        profileImage: profileImage,
+        const response = await doctorApi.signup(doctorData)
+
+        // Store user info in localStorage
+        localStorage.setItem(
+          "pulmocare_user",
+          JSON.stringify({
+            id: response.id,
+            email: response.email,
+            name: `${response.firstName} ${response.lastName}`,
+            type: "doctor",
+          }),
+        )
+
+        toast({
+          title: "Success",
+          description: "Your account has been created successfully.",
+        })
+        router.push("/")
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.response?.data || "Something went wrong during registration",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
       }
-
-      localStorage.setItem("pulmocare_doctor_profile", JSON.stringify(profileData))
-
-      // Initialize pending reports count
-      localStorage.setItem("pulmocare_pending_reports", "3")
-
-      // Redirect to doctor portal
-      router.push("/doctor")
+    } else {
+      setIsLoading(false)
     }
   }
 
   // Helper function to calculate age from date of birth
-  const calculateAge = (dob: string): string => {
+  const calculateAge = (dob: string) => {
     const birthDate = new Date(dob)
     const today = new Date()
     let age = today.getFullYear() - birthDate.getFullYear()
@@ -225,8 +234,7 @@ export default function DoctorSignUpPage() {
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--
     }
-
-    return age.toString()
+    return age
   }
 
   return (
@@ -261,12 +269,13 @@ export default function DoctorSignUpPage() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       {profileImage ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div
-                            className="w-full h-full bg-center bg-cover"
-                            style={{ backgroundImage: `url(${profileImage})` }}
-                          />
-                        </div>
+                        <Image
+                          src={profileImage || "/placeholder.svg"}
+                          alt="Profile preview"
+                          width={96}
+                          height={96}
+                          className="object-cover w-full h-full"
+                        />
                       ) : (
                         <Stethoscope className="h-12 w-12 text-primary opacity-50" />
                       )}
@@ -320,7 +329,7 @@ export default function DoctorSignUpPage() {
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="gender">Gender</Label>
-                    <Select onValueChange={(value: string) => handleSelectChange("gender", value)} value={formData.gender}>
+                    <Select onValueChange={(value) => handleSelectChange("gender", value)} value={formData.gender}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
@@ -334,7 +343,10 @@ export default function DoctorSignUpPage() {
                   </div>
                   <div className="space-y-2 col-span-1">
                     <Label htmlFor="countryCode">Country Code</Label>
-                    <Select onValueChange={(value: string) => handleSelectChange("countryCode", value)} value={formData.countryCode}>
+                    <Select
+                      onValueChange={(value) => handleSelectChange("countryCode", value)}
+                      value={formData.countryCode}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="+1" />
                       </SelectTrigger>
@@ -352,29 +364,17 @@ export default function DoctorSignUpPage() {
                         <SelectItem value="+20">+20 (EG)</SelectItem>
                       </SelectContent>
                     </Select>
-                    {errors.countryCode && <p className="text-sm text-red-500 mt-1">{errors.countryCode}</p>}
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2 col-span-3">
                     <Label htmlFor="phone">Phone Number</Label>
                     <Input
                       id="phone"
                       name="phone"
-                      placeholder="Phone Number"
+                      placeholder={`Phone Number (${phoneValidationRules[formData.countryCode as keyof typeof phoneValidationRules]?.example || "1234567890"})`}
                       value={formData.phone}
                       onChange={handleChange}
                     />
                     {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      placeholder="Address"
-                      value={formData.address}
-                      onChange={handleChange}
-                    />
-                    {errors.address && <p className="text-sm text-red-500 mt-1">{errors.address}</p>}
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="license">Medical License Number</Label>
@@ -398,11 +398,12 @@ export default function DoctorSignUpPage() {
                     />
                     {errors.about && <p className="text-sm text-red-500 mt-1">{errors.about}</p>}
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2 col-span-4">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       name="email"
+                      type="email"
                       placeholder="Email"
                       value={formData.email}
                       onChange={handleChange}
@@ -420,6 +421,22 @@ export default function DoctorSignUpPage() {
                       onChange={handleChange}
                     />
                     {errors.password && <p className="text-sm text-red-500 mt-1">{errors.password}</p>}
+                    {formData.password && (
+                      <div className="mt-2 text-xs space-y-1">
+                        <div className={passwordConditions.length ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ At least 8 characters
+                        </div>
+                        <div className={passwordConditions.uppercase ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ At least one uppercase letter
+                        </div>
+                        <div className={passwordConditions.number ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ At least one number
+                        </div>
+                        <div className={passwordConditions.special ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ At least one special character
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -434,27 +451,29 @@ export default function DoctorSignUpPage() {
                     {errors.confirmPassword && <p className="text-sm text-red-500 mt-1">{errors.confirmPassword}</p>}
                   </div>
                 </div>
+
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="agreeToTerms"
-                    checked={formData.agreeToTerms}
-                    onCheckedChange={handleCheckboxChange}
-                  />
-                  <Label htmlFor="agreeToTerms" className="text-sm">
+                  <Checkbox id="terms" checked={formData.agreeToTerms} onCheckedChange={handleCheckboxChange} />
+                  <label
+                    htmlFor="terms"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
                     I agree to the{" "}
-                    <Link href="/terms" className="text-primary underline">
-                      terms and conditions
-                    </Link>{" "}
-                    and{" "}
-                    <Link href="/privacy" className="text-primary underline">
-                      privacy policy
+                    <Link href="/terms" className="text-primary hover:underline">
+                      Terms and Conditions
                     </Link>
-                  </Label>
+                  </label>
                 </div>
                 {errors.agreeToTerms && <p className="text-sm text-red-500 mt-1">{errors.agreeToTerms}</p>}
-                <Button type="submit" className="w-full">
-                  Register
-                </Button>
+
+                <div className="flex items-center justify-between pt-2">
+                  <Link href="/signup" className="text-muted-foreground text-sm hover:underline">
+                    Back
+                  </Link>
+                  <Button className="bg-primary hover:bg-primary/90" type="submit" disabled={isLoading}>
+                    {isLoading ? "Signing up..." : "Sign Up"}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

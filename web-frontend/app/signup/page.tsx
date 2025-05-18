@@ -1,9 +1,14 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { Stethoscope, UserCogIcon } from "lucide-react"
+import { Stethoscope, UserCog } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function SignUpPage() {
+  const router = useRouter()
+
   return (
     <div className="flex min-h-screen bg-background">
       <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center">
@@ -26,7 +31,7 @@ export default function SignUpPage() {
               <Stethoscope className="h-8 w-8 text-primary mr-2" />
               <h1 className="text-3xl font-bold tracking-tight text-primary">PulmoCare</h1>
             </div>
-            <p className="text-sm text-muted-foreground">Pulmonologist Clinic Management System</p>
+            <p className="text-sm text-muted-foreground">Choose your role to sign up</p>
           </div>
           <Card>
             <CardContent className="pt-6">
@@ -52,7 +57,7 @@ export default function SignUpPage() {
                   >
                     <Link href="/signup/admin" className="w-full">
                       <div className="flex flex-col items-center justify-center">
-                        <UserCogIcon className="h-8 w-8 text-red-500" />
+                        <UserCog className="h-8 w-8 text-red-500" />
                         <span>Administrator</span>
                       </div>
                     </Link>

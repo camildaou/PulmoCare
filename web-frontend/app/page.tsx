@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,12 +9,14 @@ import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Stethoscope } from "lucide-react"
-import { adminApi } from "@/lib/api"
+import { adminApi, doctorApi } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [userType, setUserType] = useState("admin") // default to admin
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -32,7 +33,12 @@ export default function SignInPage() {
     }
 
     try {
-      const response = await adminApi.signin({ email, password })
+      let response;
+      if (userType === "admin") {
+        response = await adminApi.signin({ email, password })
+      } else {
+        response = await doctorApi.signin({ email, password })
+      }
       
       // Store user info in localStorage
       localStorage.setItem(
@@ -41,14 +47,14 @@ export default function SignInPage() {
           id: response.id,
           email: response.email,
           name: `${response.firstName} ${response.lastName}`,
-          type: "admin",
+          type: userType,
         }),
       )
 
-      // Redirect to admin dashboard
-      router.push("/admin")
+      // Redirect based on user type
+      router.push(userType === "admin" ? "/admin" : "/doctor")
     } catch (error: any) {
-      setError(error.response?.data || "Invalid email or password")
+      setError(error.response?.data?.message || "Invalid email or password")
     } finally {
       setIsLoading(false)
     }
@@ -84,6 +90,19 @@ export default function SignInPage() {
                 {error && <div className="p-3 text-sm bg-red-50 text-red-600 rounded-md">{error}</div>}
 
                 <div className="space-y-2">
+                  <Label htmlFor="userType">Sign in as</Label>
+                  <Select value={userType} onValueChange={setUserType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="doctor">Doctor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -103,19 +122,24 @@ export default function SignInPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                </div>                <Button className="w-full bg-primary" type="submit" disabled={isLoading}>
+                </div>
+
+                <Button className="w-full" type="submit" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
-                </form>
-                <Button className="w-full bg-primary mt-2" type="submit">
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-                <div className="text-center text-sm mt-2">
-                  <Link href="/terms" className="text-primary hover:underline">
-                    Terms and Policies
+              </form>
+
+              <div className="mt-4 text-center text-sm">
+                <p>Don't have an account?</p>
+                <div className="flex justify-center gap-2 mt-2">
+                  <Link href="/signup/admin">
+                    <Button variant="outline" size="sm">Sign Up as Admin</Button>
+                  </Link>
+                  <Link href="/signup/doctor">
+                    <Button variant="outline" size="sm">Sign Up as Doctor</Button>
                   </Link>
                 </div>
-              
+              </div>
             </CardContent>
           </Card>
         </div>

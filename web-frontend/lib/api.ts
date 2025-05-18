@@ -26,4 +26,31 @@ export const adminApi = {
   },
 };
 
+export const doctorApi = {
+  signup: async (doctorData: any) => {
+    const response = await api.post('/doctors/signup', doctorData);
+    return response.data;
+  },
+  signin: async (credentials: { email: string; password: string }) => {
+    const response = await api.post('/doctors/signin', credentials);
+    return response.data;
+  },
+  getProfile: async (id: string) => {
+    const response = await api.get(`/doctors/${id}`);
+    return response.data;
+  },
+  updateProfile: async (id: string, profileData: any) => {
+    const response = await api.put(`/doctors/${id}`, profileData);
+    return response.data;
+  },
+  getAllDoctors: async () => {
+    const response = await api.get('/doctors');
+    return response.data;
+  },
+  getDoctorCount: async () => {
+    const response = await api.get('/doctors/count');
+    return response.data;
+  },
+};
+
 export default api;
