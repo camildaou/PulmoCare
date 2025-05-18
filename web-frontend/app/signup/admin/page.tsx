@@ -13,6 +13,7 @@ import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Stethoscope, UserCog } from "lucide-react"
+import { adminApi } from "@/lib/api"
 
 export default function AdminSignUpPage() {
   const router = useRouter()
@@ -32,9 +33,9 @@ export default function AdminSignUpPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
-
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(false)
   const [passwordConditions, setPasswordConditions] = useState({
     length: false,
     uppercase: false,
@@ -169,27 +170,61 @@ export default function AdminSignUpPage() {
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (validateForm()) {
-      // In a real app, you would send this data to your backend
-      console.log("Form submitted:", formData)
-
-      // Store user info in localStorage for demo purposes
-      localStorage.setItem(
-        "pulmocare_user",
-        JSON.stringify({
+      try {
+        // Create the admin data object
+        const adminData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           email: formData.email,
-          name: `${formData.firstName} ${formData.lastName}`,
-          type: "admin",
-        }),
-      )
+          password: formData.password,
+          employeeId: formData.employeeId,
+          gender: formData.gender,
+          age: calculateAge(formData.dob), // Calculate age from DOB
+          phoneNumber: formData.countryCode + formData.phone,
+          location: formData.address
+        }
 
-      // Redirect to admin portal
-      router.push("/admin")
+        // Call the signup endpoint
+        const response = await adminApi.signup(adminData)
+
+        // Store user info in localStorage
+        localStorage.setItem(
+          "pulmocare_user",
+          JSON.stringify({
+            id: response.id,
+            email: response.email,
+            name: `${response.firstName} ${response.lastName}`,
+            type: "admin",
+          }),
+        )
+
+        // Show success message
+        alert("Account created successfully!")
+
+        // Redirect to admin portal
+        router.push("/admin")
+      } catch (error: any) {
+        // Show error message
+        alert(error.response?.data || "An error occurred during signup")
+      }
     }
+  }
+
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
   }
 
   return (
@@ -424,9 +459,8 @@ export default function AdminSignUpPage() {
                 <div className="flex items-center justify-between pt-2">
                   <Link href="/signup" className="text-muted-foreground text-sm hover:underline">
                     Back
-                  </Link>
-                  <Button className="bg-red-500 hover:bg-red-600" type="submit">
-                    Sign Up
+                  </Link>                  <Button className="bg-red-500 hover:bg-red-600" type="submit" disabled={isLoading}>
+                    {isLoading ? "Signing up..." : "Sign Up"}
                   </Button>
                 </div>
               </form>

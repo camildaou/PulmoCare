@@ -15,4 +15,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "PulmoCare"
+
+include("backend")
 include("mob-frontend")
+include("web-frontend")

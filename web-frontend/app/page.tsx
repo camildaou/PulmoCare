@@ -10,57 +10,47 @@ import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Stethoscope } from "lucide-react"
+import { adminApi } from "@/lib/api"
 
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
+    setIsLoading(true)
 
     // Basic validation
     if (!email || !password) {
       setError("Please enter both email and password")
+      setIsLoading(false)
       return
     }
 
-    // In a real app, you would validate against a database
-    // For demo purposes, we'll use some hardcoded values
-    const registeredUsers = [
-      { email: "doctor@example.com", password: "Doctor123!", type: "doctor", name: "John Doe" },
-      { email: "admin@example.com", password: "Admin123!", type: "admin", name: "Jane Smith" },
-    ]
+    try {
+      const response = await adminApi.signin({ email, password })
+      
+      // Store user info in localStorage
+      localStorage.setItem(
+        "pulmocare_user",
+        JSON.stringify({
+          id: response.id,
+          email: response.email,
+          name: `${response.firstName} ${response.lastName}`,
+          type: "admin",
+        }),
+      )
 
-    const user = registeredUsers.find((user) => user.email === email)
-
-    if (!user) {
-      setError("User not found. Please check your email or sign up.")
-      return
-    }
-
-    if (user.password !== password) {
-      setError("Incorrect password. Please try again.")
-      return
-    }
-
-    // Store user info in localStorage for demo purposes
-    // In a real app, you would use a more secure method like JWT tokens
-    localStorage.setItem(
-      "pulmocare_user",
-      JSON.stringify({
-        email: user.email,
-        name: user.name,
-        type: user.type,
-      }),
-    )
-
-    // Redirect based on user type
-    if (user.type === "doctor") {
-      router.push("/doctor")
-    } else if (user.type === "admin") {
+      // Redirect to admin dashboard
       router.push("/admin")
+    } catch (error: any) {
+      setError(error.response?.data || "Invalid email or password")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -113,9 +103,8 @@ export default function SignInPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                </div>
-                <Button className="w-full bg-primary" type="submit">
-                  Sign In
+                </div>                <Button className="w-full bg-primary" type="submit" disabled={isLoading}>
+                  {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
                 </form>
                 <Button className="w-full bg-primary mt-2" type="submit">
