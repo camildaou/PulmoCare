@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link"
 import { CalendarIcon, Users, BarChart3, UserIcon } from "lucide-react"
 import { useState, useEffect } from "react"
+import { doctorApi } from "@/lib/api"
 
 export default function AdminDashboard() {
   const [adminName, setAdminName] = useState("Administrator")
+  const [doctorCount, setDoctorCount] = useState<number | null>(null)
 
   useEffect(() => {
     // Get user info from localStorage in client component
@@ -18,6 +20,19 @@ export default function AdminDashboard() {
         setAdminName(user.name)
       }
     }
+  }, [])
+
+  useEffect(() => {
+    const fetchDoctorCount = async () => {
+      try {
+        const count = await doctorApi.getDoctorCount()
+        setDoctorCount(count)
+      } catch (error) {
+        console.error("Error fetching doctor count:", error)
+      }
+    }
+
+    fetchDoctorCount()
   }, [])
 
   return (
@@ -42,7 +57,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-sm font-medium">Active Doctors</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{doctorCount !== null ? doctorCount : "Loading..."}</div>
             <p className="text-xs text-muted-foreground">+1 new this month</p>
           </CardContent>
         </Card>
@@ -66,68 +81,67 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-<div className="grid gap-6 md:grid-cols-4">
-  {/* Appointments */}
-  <Link href="/admin/appointments">
-    <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
-      <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
-        <CardTitle>Manage Appointments</CardTitle>
-        <CardDescription>Schedule and manage patient appointments</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
-        <div className="rounded-full bg-primary/10 p-6">
-          <CalendarIcon className="h-12 w-12 text-primary" />
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
+      <div className="grid gap-6 md:grid-cols-4">
+        {/* Appointments */}
+        <Link href="/admin/appointments">
+          <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
+            <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
+              <CardTitle>Manage Appointments</CardTitle>
+              <CardDescription>Schedule and manage patient appointments</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
+              <div className="rounded-full bg-primary/10 p-6">
+                <CalendarIcon className="h-12 w-12 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-  {/* Doctors */}
-  <Link href="/admin/doctors">
-    <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
-      <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
-        <CardTitle>Manage Doctors</CardTitle>
-        <CardDescription>View doctor schedules and information</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
-        <div className="rounded-full bg-primary/10 p-6">
-          <UserIcon className="h-12 w-12 text-primary" />
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
+        {/* Doctors */}
+        <Link href="/admin/doctors">
+          <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
+            <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
+              <CardTitle>Manage Doctors</CardTitle>
+              <CardDescription>View doctor schedules and information</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
+              <div className="rounded-full bg-primary/10 p-6">
+                <UserIcon className="h-12 w-12 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-  {/* Patients */}
-  <Link href="/admin/patients">
-    <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
-      <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
-        <CardTitle>Manage Patients</CardTitle>
-        <CardDescription>View and update patient information</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
-        <div className="rounded-full bg-secondary/10 p-6">
-          <Users className="h-12 w-12 text-secondary" />
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
+        {/* Patients */}
+        <Link href="/admin/patients">
+          <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
+            <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
+              <CardTitle>Manage Patients</CardTitle>
+              <CardDescription>View and update patient information</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
+              <div className="rounded-full bg-secondary/10 p-6">
+                <Users className="h-12 w-12 text-secondary" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-  {/* Analysis */}
-  <Link href="/admin/analysis">
-    <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
-      <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
-        <CardTitle>Data Analysis</CardTitle>
-        <CardDescription>Access prediction and detection tools</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
-        <div className="rounded-full bg-primary/10 p-6">
-          <BarChart3 className="h-12 w-12 text-primary" />
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
-</div>
-
+        {/* Analysis */}
+        <Link href="/admin/analysis">
+          <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
+            <CardHeader className="min-h-[100px] flex flex-col justify-center items-center text-center">
+              <CardTitle>Data Analysis</CardTitle>
+              <CardDescription>Access prediction and detection tools</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center gap-4 pt-4">
+              <div className="rounded-full bg-primary/10 p-6">
+                <BarChart3 className="h-12 w-12 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
     </div>
   )
 }

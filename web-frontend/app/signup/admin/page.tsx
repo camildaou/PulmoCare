@@ -24,7 +24,7 @@ export default function AdminSignUpPage() {
     lastName: "",
     dob: "",
     gender: "",
-    countryCode: "+1",
+    countryCode: "",
     phone: "",
     address: "",
     employeeId: "",
@@ -457,7 +457,7 @@ export default function AdminSignUpPage() {
                 {errors.agreeToTerms && <p className="text-sm text-red-500 mt-1">{errors.agreeToTerms}</p>}
 
                 <div className="flex items-center justify-between pt-2">
-                  <Link href="/signup" className="text-muted-foreground text-sm hover:underline">
+                  <Link href="/" className="text-muted-foreground text-sm hover:underline">
                     Back
                   </Link>                  <Button className="bg-red-500 hover:bg-red-600" type="submit" disabled={isLoading}>
                     {isLoading ? "Signing up..." : "Sign Up"}

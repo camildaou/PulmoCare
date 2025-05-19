@@ -19,8 +19,13 @@ public class DoctorController {
 
     // Get doctor by ID
     @GetMapping("/{id}")
-    public ResponseEntity<Doctor> getDoctor(@PathVariable String id) {
-        return ResponseEntity.ok(doctorService.getDoctorById(id));
+    public ResponseEntity<?> getDoctor(@PathVariable String id) {
+        try {
+            Doctor doctor = doctorService.getDoctorById(id);
+            return ResponseEntity.ok(doctor);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // Sign in
@@ -33,8 +38,13 @@ public class DoctorController {
 
     // Sign up
     @PostMapping("/signup")
-    public ResponseEntity<Doctor> createDoctor(@RequestBody Doctor doctor) {
-        return ResponseEntity.ok(doctorService.createDoctor(doctor));
+    public ResponseEntity<?> createDoctor(@RequestBody Doctor doctor) {
+        try {
+            Doctor createdDoctor = doctorService.createDoctor(doctor);
+            return ResponseEntity.ok(createdDoctor);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // Get all doctors

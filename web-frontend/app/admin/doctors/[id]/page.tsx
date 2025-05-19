@@ -1,19 +1,47 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { doctorApi } from "@/lib/api"
+import { Doctor } from "@/lib/types"
 
 export default function DoctorInfoPage({ params }: { params: { id: string } }) {
-  // In a real app, you would fetch doctor data based on the ID
-  const doctorId = params.id
+  const [doctor, setDoctor] = useState<Doctor | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDoctor = async () => {
+      try {
+        const response = await doctorApi.getProfile(params.id)
+        setDoctor(response)
+      } catch (error) {
+        console.error("Error fetching doctor info:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDoctor()
+  }, [params.id])
+
+  if (isLoading) {
+    return <p>Loading doctor information...</p>
+  }
+
+  if (!doctor) {
+    return <p>Doctor not found.</p>
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Doctor Information</h1>
-          <p className="text-muted-foreground">View and manage doctor details.</p>
+          <p className="text-muted-foreground">View doctor details.</p>
         </div>
         <Link href="/admin/doctors">
           <Button variant="outline">Back to Doctors</Button>
@@ -31,16 +59,10 @@ export default function DoctorInfoPage({ params }: { params: { id: string } }) {
               />
             </div>
             <div className="text-center">
-              <h2 className="text-xl font-bold">Dr. John Doe</h2>
-              <p className="text-sm text-muted-foreground">Pulmonologist</p>
-            </div>
-            <div className="w-full space-y-2">
-              <Button variant="outline" className="w-full">
-                Change Photo
-              </Button>
-              <Button variant="outline" className="w-full">
-                Reset Password
-              </Button>
+              <h2 className="text-xl font-bold">
+                {doctor.firstName} {doctor.lastName}
+              </h2>
+              <p className="text-sm text-muted-foreground">{doctor.description || "No specialty provided"}</p>
             </div>
           </CardContent>
         </Card>
@@ -53,58 +75,43 @@ export default function DoctorInfoPage({ params }: { params: { id: string } }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" defaultValue="John" />
+                <Input id="firstName" value={doctor.firstName} readOnly />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" defaultValue="Doe" />
+                <Input id="lastName" value={doctor.lastName} readOnly />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
-                <Input id="gender" defaultValue="Male" readOnly />
+                <Input id="gender" value={doctor.gender} readOnly />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="age">Age</Label>
-                <Input id="age" defaultValue="45" readOnly />
+                <Input id="age" value={doctor.age?.toString() || "N/A"} readOnly />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue="john.doe@example.com" />
+              <Input id="email" value={doctor.email} readOnly />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" defaultValue="+1 (555) 123-4567" />
+              <Input id="phone" value={doctor.phone} readOnly />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="license">Medical License</Label>
-              <Input id="license" defaultValue="ML12345678" readOnly />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="specialty">Specialty</Label>
-              <Input id="specialty" defaultValue="Pulmonology, Critical Care" />
+              <Input id="license" value={doctor.medicalLicense} readOnly />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Input id="location" defaultValue="123 Medical Center, New York, NY" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hospital">Hospital/Clinic</Label>
-              <Input id="hospital" defaultValue="Memorial Hospital, Building A, Floor 3" />
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline">Cancel</Button>
-              <Button>Save Changes</Button>
+              <Input id="location" value={doctor.location} readOnly />
             </div>
           </CardContent>
         </Card>

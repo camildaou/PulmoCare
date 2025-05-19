@@ -10,28 +10,42 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
+import { doctorApi } from "@/lib/api"
+
+interface ProfileData {
+  firstName: string
+  lastName: string
+  gender: string
+  age: string
+  email: string
+  phone: string
+  license: string
+  about: string
+  location: string
+  countryCode?: string // Added countryCode to the interface
+}
 
 export default function DoctorProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [doctorName, setDoctorName] = useState("John Doe")
-  const [formData, setFormData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    gender: "Male",
-    age: "45",
-    email: "john.doe@example.com",
-    countryCode: "+1",
-    phone: "5551234567",
-    license: "ML12345678",
-    about:
-      "Pulmonology specialist with over 15 years of experience in treating respiratory conditions. Special interest in asthma management and COPD.",
-    location: "123 Medical Center, New York, NY",
-    hospital: "Memorial Hospital, Building A, Floor 3",
-  })
+  const [profileData, setProfileData] = useState<ProfileData>(() => ({
+    firstName: "",
+    lastName: "",
+    gender: "",
+    age: "",
+    email: "",
+    phone: "",
+    license: "",
+    about: "",
+    location: "",
+    countryCode: "+1", // Default country code
+  }))
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [saved, setSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
 
   // Phone validation rules by country code
   const phoneValidationRules = {
@@ -72,7 +86,7 @@ export default function DoctorProfilePage() {
           setDoctorName(user.name)
           const nameParts = user.name.split(" ")
           if (nameParts.length >= 2) {
-            setFormData((prev) => ({
+            setProfileData((prev) => ({
               ...prev,
               firstName: nameParts[0],
               lastName: nameParts.slice(1).join(" "),
@@ -82,7 +96,7 @@ export default function DoctorProfilePage() {
 
         // Load email from user data
         if (user.email) {
-          setFormData((prev) => ({
+          setProfileData((prev) => ({
             ...prev,
             email: user.email,
           }))
@@ -94,7 +108,7 @@ export default function DoctorProfilePage() {
       if (profileData) {
         try {
           const profile = JSON.parse(profileData)
-          setFormData((prev) => ({
+          setProfileData((prev) => ({
             ...prev,
             ...profile,
           }))
@@ -114,9 +128,44 @@ export default function DoctorProfilePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const fetchDoctorProfile = async () => {
+      try {
+        const userInfo = localStorage.getItem("pulmocare_user")
+        if (!userInfo) {
+          throw new Error("User information not found. Please log in again.")
+        }
+
+        const user = JSON.parse(userInfo)
+        const doctorId = user.id
+
+        // Fetch the doctor's profile from the backend
+        const doctorProfile = await doctorApi.getProfile(doctorId)
+
+        // Update the form data with the fetched profile
+        setProfileData((prev) => ({
+          ...prev,
+          ...doctorProfile,
+        }))
+
+        // If there's a profile image, load it
+        if (doctorProfile.profileImage) {
+          setProfileImage(doctorProfile.profileImage)
+        }
+      } catch (error) {
+        console.error("Error fetching doctor profile:", error)
+        alert("An error occurred while fetching the profile. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDoctorProfile()
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setProfileData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,7 +194,7 @@ export default function DoctorProfilePage() {
                 localStorage.setItem("pulmocare_doctor_profile", JSON.stringify(profile))
               } else {
                 // Create new profile data if it doesn't exist
-                const newProfile = { ...formData, profileImage: imageData }
+                const newProfile = { profileImage: imageData };
                 localStorage.setItem("pulmocare_doctor_profile", JSON.stringify(newProfile))
               }
             } catch (error) {
@@ -175,21 +224,21 @@ export default function DoctorProfilePage() {
     const newErrors: Record<string, string> = {}
 
     // Check required fields
-    const requiredFields = ["firstName", "lastName", "email", "phone", "about", "location", "hospital"]
+    const requiredFields = ["firstName", "lastName", "email", "phone", "about", "location"]
     requiredFields.forEach((field) => {
-      if (!formData[field as keyof typeof formData]) {
+      if (!profileData[field as keyof typeof profileData]) {
         newErrors[field] = "This field is required"
       }
     })
 
     // Validate email
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (profileData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.email)) {
       newErrors.email = "Please enter a valid email address"
     }
 
     // Validate phone number based on country code
-    const phoneNumber = formData.phone.replace(/\D/g, "") // Remove non-digits
-    const countryCode = formData.countryCode || "+1"
+    const phoneNumber = profileData.phone.replace(/\D/g, "") // Remove non-digits
+    const countryCode = profileData.countryCode || "+1"
     const rule = phoneValidationRules[countryCode as keyof typeof phoneValidationRules]
     if (rule && phoneNumber.length !== rule.length) {
       newErrors.phone = `Please enter a valid ${rule.length}-digit phone number for ${countryCode}`
@@ -199,32 +248,44 @@ export default function DoctorProfilePage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSave = () => {
+  // Ensure the specified fields are editable and bound to the profileData state
+  const handleSaveChanges = async () => {
     if (validateForm()) {
+      setIsSaving(true)
+      setSaveMessage("")
+
       try {
-        // Update the doctor name in localStorage
         const userInfo = localStorage.getItem("pulmocare_user")
-        if (userInfo) {
-          const user = JSON.parse(userInfo)
-          user.name = `${formData.firstName} ${formData.lastName}`
-          user.email = formData.email
-          localStorage.setItem("pulmocare_user", JSON.stringify(user))
-          setDoctorName(user.name)
+        if (!userInfo) {
+          throw new Error("User information not found. Please log in again.")
         }
 
-        // Save the full profile data
-        const profileData = {
-          ...formData,
-          // Only include profileImage if it exists and hasn't errored
-          ...(profileImage && !imageError ? { profileImage } : {}),
-        }
-        localStorage.setItem("pulmocare_doctor_profile", JSON.stringify(profileData))
+        const user = JSON.parse(userInfo)
+        const doctorId = user.id
 
-        setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
-      } catch (error) {
-        console.error("Error saving profile:", error)
-        alert("Failed to save profile. Please try again.")
+        // Map 'about' to 'description' in the payload
+        const updatedProfileData = {
+          ...profileData,
+          description: profileData.about, // Map 'about' to 'description'
+        };
+
+        await doctorApi.updateProfile(doctorId, updatedProfileData)
+
+        setSaveMessage("Profile updated successfully!")
+
+        // Update localStorage user data
+        const updatedUserData = {
+          ...JSON.parse(userInfo),
+          name: `${profileData.firstName} ${profileData.lastName}`,
+        }
+        localStorage.setItem("pulmocare_user", JSON.stringify(updatedUserData))
+
+        setTimeout(() => setSaveMessage(""), 3000)
+      } catch (error: any) {
+        console.error("Error updating profile:", error)
+        setSaveMessage(error.response?.data || "Failed to update profile")
+      } finally {
+        setIsSaving(false)
       }
     }
   }
@@ -234,6 +295,15 @@ export default function DoctorProfilePage() {
     clearProfileImage()
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading profile...</p>
+      </div>
+    )
+  }
+
+  // Ensure all fields are displayed, but only specified ones are editable
   return (
     <div className="space-y-6">
       <div>
@@ -244,39 +314,18 @@ export default function DoctorProfilePage() {
       <div className="grid gap-6 md:grid-cols-[300px_1fr]">
         <Card>
           <CardContent className="p-6 flex flex-col items-center gap-4">
-            <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-primary">
-              {profileImage && !imageError ? (
-                // Use regular img tag for data URLs to avoid Next.js Image optimization issues
-                <img
-                  src={profileImage || "/placeholder.svg"}
-                  alt="Doctor profile"
-                  className="w-full h-full object-cover"
-                  onError={handleImageError}
-                />
-              ) : (
-                // Use Next.js Image only for the placeholder
-                <Image
-                  src="/placeholder.svg?height=128&width=128"
-                  alt="Doctor profile"
-                  width={128}
-                  height={128}
-                  className="object-cover"
-                />
-              )}
+            <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-secondary">
+              <div
+                className="w-full h-full bg-center bg-cover"
+                style={{ backgroundImage: `url('/placeholder.svg?height=128&width=128')` }}
+                aria-label="Doctor profile"
+              />
             </div>
             <div className="text-center">
-              <h2 className="text-xl font-bold">Dr. {doctorName}</h2>
+              <h2 className="text-xl font-bold">
+                {profileData.firstName} {profileData.lastName}
+              </h2>
               <p className="text-sm text-muted-foreground">Pulmonologist</p>
-              <p className="text-xs text-muted-foreground mt-1">{formData.hospital}</p>
-            </div>
-            <div className="w-full space-y-2">
-              <Button variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()}>
-                Change Photo
-              </Button>
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-              <Button variant="outline" className="w-full">
-                Change Password
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -286,106 +335,82 @@ export default function DoctorProfilePage() {
             <CardTitle>Personal Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {saved && (
-              <div className="bg-green-50 text-green-600 p-3 rounded-md text-sm">
-                Profile information saved successfully!
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" name="firstName" value={formData.firstName} onChange={handleChange} />
-                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  value={profileData.firstName}
+                  onChange={handleChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" name="lastName" value={formData.lastName} onChange={handleChange} />
-                {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  value={profileData.lastName}
+                  onChange={handleChange}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
-                <Input id="gender" name="gender" value={formData.gender} readOnly />
+                <Input id="gender" value={profileData.gender} readOnly />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="age">Age</Label>
-                <Input id="age" name="age" value={formData.age} readOnly />
+                <Input id="age" value={profileData.age} readOnly />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full"
-              />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              <Input id="email" type="email" value={profileData.email} readOnly className="bg-gray-50" />
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
-              <div className="space-y-2 col-span-1">
-                <Label htmlFor="countryCode">Country Code</Label>
-                <Select
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, countryCode: value }))}
-                  value={formData.countryCode}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="+1" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+1">+1 (US/CA)</SelectItem>
-                    <SelectItem value="+44">+44 (UK)</SelectItem>
-                    <SelectItem value="+33">+33 (FR)</SelectItem>
-                    <SelectItem value="+49">+49 (DE)</SelectItem>
-                    <SelectItem value="+61">+61 (AU)</SelectItem>
-                    <SelectItem value="+91">+91 (IN)</SelectItem>
-                    <SelectItem value="+966">+966 (SA)</SelectItem>
-                    <SelectItem value="+971">+971 (UAE)</SelectItem>
-                    <SelectItem value="+962">+962 (JO)</SelectItem>
-                    <SelectItem value="+961">+961 (LB)</SelectItem>
-                    <SelectItem value="+20">+20 (EG)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 col-span-3">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} />
-                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={profileData.phone}
+                onChange={handleChange}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="license">Medical License</Label>
-              <Input id="license" name="license" value={formData.license} readOnly />
+              <Input id="license" value={profileData.license} readOnly className="bg-gray-50" />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="about">About the Doctor</Label>
-              <Textarea id="about" name="about" value={formData.about} onChange={handleChange} rows={4} />
-              {errors.about && <p className="text-red-500 text-sm mt-1">{errors.about}</p>}
+              <Label htmlFor="about">About</Label>
+              <Textarea
+                id="about"
+                name="about"
+                value={profileData.about}
+                onChange={handleChange}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Input id="location" name="location" value={formData.location} onChange={handleChange} />
-              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
+              <Input
+                id="location"
+                name="location"
+                value={profileData.location}
+                onChange={handleChange}
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hospital">Hospital/Clinic</Label>
-              <Input id="hospital" name="hospital" value={formData.hospital} onChange={handleChange} />
-              {errors.hospital && <p className="text-red-500 text-sm mt-1">{errors.hospital}</p>}
-            </div>
+            {saveMessage && <div className="p-2 bg-green-100 text-green-800 rounded-md text-center">{saveMessage}</div>}
 
-            <Button className="w-full" onClick={handleSave}>
-              Save Changes
+            <Button className="w-full" onClick={handleSaveChanges} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </CardContent>
         </Card>

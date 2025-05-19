@@ -13,7 +13,6 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Stethoscope } from "lucide-react"
 import { doctorApi } from "@/lib/api"
-import { toast } from "@/hooks/use-toast"
 
 export default function DoctorSignUpPage() {
   const router = useRouter()
@@ -24,7 +23,7 @@ export default function DoctorSignUpPage() {
     lastName: "",
     dob: "",
     gender: "",
-    countryCode: "+1",
+    countryCode: "",
     phone: "",
     address: "",
     license: "",
@@ -175,23 +174,24 @@ export default function DoctorSignUpPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
 
     if (validateForm()) {
       try {
+        // Create the doctor data object
         const doctorData = {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
           password: formData.password,
+          license: formData.license,
+          description: formData.about, // Map 'about' to 'description'
           gender: formData.gender,
+          dob: formData.dob, // Send date of birth as is
+          phoneNumber: formData.countryCode + formData.phone, // Concatenate country code and phone
           location: formData.address,
-          age: calculateAge(formData.dob),
-          phoneNumber: formData.countryCode + formData.phone,
-          medicalLicense: formData.license,
-          description: formData.about,
         }
 
+        // Call the signup endpoint
         const response = await doctorApi.signup(doctorData)
 
         // Store user info in localStorage
@@ -204,23 +204,14 @@ export default function DoctorSignUpPage() {
             type: "doctor",
           }),
         )
+        alert("Account created successfully!")
 
-        toast({
-          title: "Success",
-          description: "Your account has been created successfully.",
-        })
-        router.push("/")
+        // Redirect to doctor portal
+        router.push("/doctors")
       } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.response?.data || "Something went wrong during registration",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+        // Show error message
+        alert(error.response?.data || "An error occurred during signup")
       }
-    } else {
-      setIsLoading(false)
     }
   }
 
@@ -467,7 +458,7 @@ export default function DoctorSignUpPage() {
                 {errors.agreeToTerms && <p className="text-sm text-red-500 mt-1">{errors.agreeToTerms}</p>}
 
                 <div className="flex items-center justify-between pt-2">
-                  <Link href="/signup" className="text-muted-foreground text-sm hover:underline">
+                  <Link href="/" className="text-muted-foreground text-sm hover:underline">
                     Back
                   </Link>
                   <Button className="bg-primary hover:bg-primary/90" type="submit" disabled={isLoading}>
