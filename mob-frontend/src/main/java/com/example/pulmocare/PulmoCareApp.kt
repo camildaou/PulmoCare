@@ -260,7 +260,7 @@ fun PulmoCareApp() {
                                 }
                             }
                         } else {
-//                            AppointmentScreen() TODO
+                           AppointmentScreen()
                         }
                     }
 

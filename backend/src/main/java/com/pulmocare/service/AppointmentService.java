@@ -36,6 +36,9 @@ public class AppointmentService {
         // Check if the referenced patient and doctor exist
         validatePatientAndDoctor(appointment);
         
+        // Validate that the appointment time is available for the doctor
+        validateAppointmentTime(appointment);
+        
         return appointmentRepository.save(appointment);
     }
     
@@ -116,6 +119,21 @@ public class AppointmentService {
     public Appointment updateAppointment(String id, Appointment appointmentDetails) {
         Appointment appointment = getAppointmentById(id);
         
+        // Check if the date or time is being changed, and validate availability if so
+        boolean timeChanged = (appointmentDetails.getDate() != null && !appointmentDetails.getDate().equals(appointment.getDate())) ||
+                             (appointmentDetails.getHour() != null && !appointmentDetails.getHour().equals(appointment.getHour()));
+        
+        if (timeChanged && appointmentDetails.getDoctor() != null) {
+            // Create a temporary appointment for validation
+            Appointment tempAppointment = new Appointment();
+            tempAppointment.setDoctor(appointmentDetails.getDoctor());
+            tempAppointment.setDate(appointmentDetails.getDate() != null ? appointmentDetails.getDate() : appointment.getDate());
+            tempAppointment.setHour(appointmentDetails.getHour() != null ? appointmentDetails.getHour() : appointment.getHour());
+            
+            // Validate the new time slot
+            validateAppointmentTime(tempAppointment);
+        }
+        
         // Update fields from the details object
         if (appointmentDetails.getDate() != null) {
             appointment.setDate(appointmentDetails.getDate());
@@ -188,6 +206,67 @@ public class AppointmentService {
             Doctor doctor = doctorRepository.findById(appointment.getDoctor().getId())
                 .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + appointment.getDoctor().getId()));
             appointment.setDoctor(doctor);
+        }
+    }
+    
+    /**
+     * Validate that the appointment time is available for the doctor
+     */
+    private void validateAppointmentTime(Appointment appointment) {
+        if (appointment.getDoctor() == null || appointment.getDoctor().getId() == null || 
+            appointment.getDate() == null || appointment.getHour() == null) {
+            throw new RuntimeException("Doctor, date, and time are required for appointment validation");
+        }
+        
+        Doctor doctor = appointment.getDoctor();
+        LocalDate date = appointment.getDate();
+        LocalTime startTime = appointment.getHour();
+        
+        // Calculate end time (30 minutes later)
+        LocalTime endTime = startTime.plusMinutes(30);
+        
+        // Format times as HH:MM for validation
+        String startTimeStr = String.format("%02d:%02d", startTime.getHour(), startTime.getMinute());
+        String endTimeStr = String.format("%02d:%02d", endTime.getHour(), endTime.getMinute());
+        
+        // Check if the date is in the unavailable dates list
+        if (doctor.getUnavailableDates() != null && 
+            doctor.getUnavailableDates().contains(date.toString())) {
+            throw new RuntimeException("Doctor is unavailable on this date");
+        }
+        
+        // Get the day of the week (lowercase)
+        String dayOfWeek = date.getDayOfWeek().toString().toLowerCase().substring(0, 3);
+        
+        // Check if the doctor works on this day
+        if (!doctor.getAvailableDays().contains(dayOfWeek)) {
+            throw new RuntimeException("Doctor doesn't work on " + date.getDayOfWeek().toString());
+        }
+        
+        // Get the available time slots for this day
+        List<Doctor.TimeSlot> availableSlots = doctor.getAvailableTimeSlots().get(dayOfWeek);
+        if (availableSlots == null || availableSlots.isEmpty()) {
+            throw new RuntimeException("Doctor has no available time slots on this day");
+        }
+        
+        // Check if the requested time slot is in the doctor's available time slots
+        boolean timeSlotAvailable = false;
+        for (Doctor.TimeSlot slot : availableSlots) {
+            if (slot.getStartTime().equals(startTimeStr) && slot.getEndTime().equals(endTimeStr)) {
+                timeSlotAvailable = true;
+                break;
+            }
+        }
+        if (!timeSlotAvailable) {
+            throw new RuntimeException("The requested time slot is not in the doctor's available time slots");
+        }
+        
+        // Check if there are any existing appointments at this time
+        List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(doctor.getId(), date);
+        for (Appointment existingAppointment : existingAppointments) {
+            if (existingAppointment.getHour().equals(startTime)) {
+                throw new RuntimeException("The doctor already has an appointment at this time");
+            }
         }
     }
 }

@@ -81,13 +81,12 @@ class AppointmentViewModel(
                 }
         }
     }
-    
-    /**
+      /**
      * Get appointment by ID
      */
     fun getAppointmentById(id: String, onSuccess: (Appointment) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            appointmentRepository.getAppointmentById(id)
+            appointmentRepository.fetchAppointmentById(id)
                 .catch { 
                     Log.e(TAG, "Error getting appointment", it)
                     onError(it.message ?: "Unknown error")
