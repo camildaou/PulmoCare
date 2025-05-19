@@ -80,8 +80,8 @@ export default function PatientsPage() {
   const filteredPatients = patients.filter((patient) => {
     const query = searchQuery.toLowerCase()
     return (
-      patient.firstName.toLowerCase().includes(query) ||
-      patient.lastName.toLowerCase().includes(query) ||
+      (patient.firstName && patient.firstName.toLowerCase().includes(query)) ||
+      (patient.lastName && patient.lastName.toLowerCase().includes(query)) ||
       (patient.location && patient.location.toLowerCase().includes(query))
     )
   })

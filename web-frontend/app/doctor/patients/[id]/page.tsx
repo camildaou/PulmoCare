@@ -52,6 +52,12 @@ export default function PatientDetailsPage() {
     temperature: '',
     respiratoryRate: '',
   })
+  const [editAllergiesDialogOpen, setEditAllergiesDialogOpen] = useState(false);
+  const [editSurgeriesDialogOpen, setEditSurgeriesDialogOpen] = useState(false);
+  const [editChronicDialogOpen, setEditChronicDialogOpen] = useState(false);
+  const [editedAllergies, setEditedAllergies] = useState(patient?.allergies || []);
+  const [editedSurgeries, setEditedSurgeries] = useState<{ name: string }[]>([]);
+  const [editedChronicConditions, setEditedChronicConditions] = useState(patient?.chronicConditions || []);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -107,27 +113,27 @@ export default function PatientDetailsPage() {
   const handleSavePatient = async () => {
     try {
       if (typeof id === 'string') {
-        // Map form data to the required structure
-        const updatedPatientData = {
-          id: id, // Ensure id is explicitly set
-          firstName: editedPatient.firstName,
-          lastName: editedPatient.lastName,
-          name: editedPatient.name,
-          location: editedPatient.location,
-          age: parseInt(editedPatient.age, 10), // Ensure age is a number
+        // Validate and sanitize data
+        const updatedPatientData: Patient = {
+          id: id,
+          firstName: editedPatient.firstName.trim(),
+          lastName: editedPatient.lastName.trim(),
+          name: editedPatient.name.trim(),
+          location: editedPatient.location?.trim() || '',
+          age: parseInt(editedPatient.age, 10) || 0, // Default to 0 if invalid
           condition: patient?.condition || '',
           lastVisit: patient?.lastVisit || '',
           photo: patient?.photo || '',
-          insuranceProvider: editedPatient.insuranceProvider,
-          gender: editedPatient.gender,
-          email: editedPatient.email,
-          bloodType: editedPatient.bloodType,
-          height: parseFloat(editedPatient.height), // Convert height to a number
-          weight: parseFloat(editedPatient.weight), // Convert weight to a number
-          maritalStatus: editedPatient.maritalStatus,
-          occupation: editedPatient.occupation,
-          hasPets: editedPatient.pets === 'Yes', // Convert to boolean
-          isSmoking: editedPatient.smoking === 'Yes', // Convert to boolean
+          insuranceProvider: editedPatient.insuranceProvider?.trim() || '',
+          gender: editedPatient.gender?.trim() || '',
+          email: editedPatient.email?.trim() || '',
+          bloodType: editedPatient.bloodType?.trim() || '',
+          height: parseFloat(editedPatient.height) || 0, // Default to 0 if invalid
+          weight: parseFloat(editedPatient.weight) || 0, // Default to 0 if invalid
+          maritalStatus: editedPatient.maritalStatus?.trim() || '',
+          occupation: editedPatient.occupation?.trim() || '',
+          hasPets: editedPatient.pets === 'Yes',
+          isSmoking: editedPatient.smoking === 'Yes',
           previousDiagnosis: patient?.previousDiagnosis || [],
           previousPlans: patient?.previousPlans || [],
           previousPrescriptions: patient?.previousPrescriptions || [],
@@ -139,8 +145,8 @@ export default function PatientDetailsPage() {
           otherImaging: patient?.otherImaging || [],
           vaccinationHistory: patient?.vaccinationHistory || [],
           vitals: patient?.vitals || {},
-          allergies: patient?.allergies || [],
-          chronicConditions: patient?.chronicConditions || [],
+          allergies: patient?.allergies?.map((item) => item.trim()) || [],
+          chronicConditions: patient?.chronicConditions?.map((item) => item.trim()) || [],
           surgeriesHistory: patient?.surgeriesHistory || [],
         };
 
@@ -153,12 +159,7 @@ export default function PatientDetailsPage() {
         setEditDialogOpen(false);
 
         // Optionally, update local state or cache if needed
-        setPatient({
-          ...updatedPatientData,
-          age: updatedPatientData.age, // Keep age as a number
-          height: updatedPatientData.height, // Keep height as a number
-          weight: updatedPatientData.weight, // Keep weight as a number
-        });
+        setPatient(updatedPatientData);
       } else {
         console.error('Invalid patient ID');
         toast.error('Failed to update patient information.');
@@ -209,6 +210,118 @@ export default function PatientDetailsPage() {
       toast.error('Failed to update patient vitals.');
     }
   }
+
+  // Handle saving edited allergies
+  const handleSaveAllergies = async () => {
+    try {
+      if (typeof id === 'string') {
+        // Ensure allergies are formatted as a string array
+        const formattedAllergies = editedAllergies.map((item) => item.trim()).filter((item) => item);
+
+        // Call the PUT endpoint to update the patient allergies in the database
+        await adminApi.updatePatient(id, {
+          ...(patient as Patient),
+          allergies: formattedAllergies,
+        });
+
+        toast.success('Allergies updated successfully!');
+        setEditAllergiesDialogOpen(false);
+
+        // Optionally, update local state or cache if needed
+        setPatient((prev) => prev ? { ...prev, allergies: formattedAllergies } : prev);
+      } else {
+        console.error('Invalid patient ID');
+        toast.error('Failed to update allergies.');
+      }
+    } catch (error) {
+      console.error('Error updating allergies:', error);
+      toast.error('Failed to update allergies.');
+    }
+  };
+
+  // Handle saving edited chronic conditions
+  const handleSaveChronicConditions = async () => {
+    try {
+      if (typeof id === 'string') {
+        // Ensure chronic conditions are formatted as a string array
+        const formattedChronicConditions = editedChronicConditions.map((item) => item.trim()).filter((item) => item);
+
+        // Call the PUT endpoint to update the patient chronic conditions in the database
+        await adminApi.updatePatient(id, {
+          ...(patient as Patient),
+          chronicConditions: formattedChronicConditions,
+        });
+
+        toast.success('Chronic conditions updated successfully!');
+        setEditChronicDialogOpen(false);
+
+        // Optionally, update local state or cache if needed
+        setPatient((prev) => prev ? { ...prev, chronicConditions: formattedChronicConditions } : prev);
+      } else {
+        console.error('Invalid patient ID');
+        toast.error('Failed to update chronic conditions.');
+      }
+    } catch (error) {
+      console.error('Error updating chronic conditions:', error);
+      toast.error('Failed to update chronic conditions.');
+    }
+  };
+
+  // Handle saving edited surgeries
+  const handleSaveSurgeries = async () => {
+    try {
+      if (typeof id === 'string') {
+        // Ensure surgeries history is formatted as an array of objects with a `name` property
+        const formattedSurgeries = editedSurgeries.map((item) => ({
+          name: item.name.trim(),
+        })).filter((item) => item.name);
+
+        // Call the PUT endpoint to update the patient surgeries history in the database
+        await adminApi.updatePatient(id, {
+          ...(patient as Patient),
+          surgeriesHistory: formattedSurgeries,
+        });
+
+        toast.success('Surgeries history updated successfully!');
+        setEditSurgeriesDialogOpen(false);
+
+        // Optionally, update local state or cache if needed
+        setPatient((prev) => prev ? { ...prev, surgeriesHistory: formattedSurgeries } : prev);
+      } else {
+        console.error('Invalid patient ID');
+        toast.error('Failed to update surgeries history.');
+      }
+    } catch (error) {
+      console.error('Error updating surgeries history:', error);
+      toast.error('Failed to update surgeries history.');
+    }
+  };
+
+  const handleInputChange = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    const items = input.split(',').map((item) => item.trim()).filter((item) => item);
+    setter(items);
+  };
+
+  const handleStringArrayInputChange = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    const items = input.split(',').map((item) => item.trim()).filter((item) => item);
+    setter(items);
+  };
+
+  const handleObjectArrayInputChange = (setter: React.Dispatch<React.SetStateAction<Record<string, any>[]>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    const items = input.split(',').map((item) => ({ name: item.trim() })).filter((item) => item.name);
+    setter(items);
+  };
+
+  function handleSurgeriesInputChange(value: string) {
+    const surgeriesArray = value.split(',').map((item) => ({ name: item.trim() })).filter((item) => item.name);
+    setEditedSurgeries(surgeriesArray);
+  }
+
+  // Update the display logic for surgeries to show only the value without the `name:` prefix
+  const displayedSurgeries = patient?.surgeriesHistory?.map((surgery) => surgery.name || surgery) || [];
 
   if (!patient) {
     return <p>Loading patient details...</p>;
@@ -628,6 +741,39 @@ export default function PatientDetailsPage() {
                     ) : (
                       <p className="text-muted-foreground italic">No allergies reported.</p>
                     )}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditAllergiesDialogOpen(true)}
+                      >
+                        Edit Allergies
+                      </Button>
+                    </div>
+
+                    {/* Edit Allergies Dialog */}
+                    <Dialog open={editAllergiesDialogOpen} onOpenChange={setEditAllergiesDialogOpen}>
+                      <DialogContent className="sm:max-w-[800px] max-w-full">
+                        <DialogHeader>
+                          <DialogTitle>Edit Allergies</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Label htmlFor="allergies">Allergies</Label>
+                          <Input
+                            id="allergies"
+                            value={editedAllergies.join(', ')}
+                            onChange={handleStringArrayInputChange(setEditedAllergies)}
+                            placeholder="Enter allergies separated by commas"
+                          />
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                          <Button onClick={handleSaveAllergies}>Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   {/* Chronic Conditions Section */}
@@ -642,6 +788,39 @@ export default function PatientDetailsPage() {
                     ) : (
                       <p className="text-muted-foreground italic">No chronic conditions reported.</p>
                     )}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditChronicDialogOpen(true)}
+                      >
+                        Edit Chronic Conditions
+                      </Button>
+                    </div>
+
+                    {/* Edit Chronic Conditions Dialog */}
+                    <Dialog open={editChronicDialogOpen} onOpenChange={setEditChronicDialogOpen}>
+                      <DialogContent className="sm:max-w-[800px] max-w-full">
+                        <DialogHeader>
+                          <DialogTitle>Edit Chronic Conditions</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Label htmlFor="chronicConditions">Chronic Conditions</Label>
+                          <Input
+                            id="chronicConditions"
+                            value={editedChronicConditions.join(', ')}
+                            onChange={handleStringArrayInputChange(setEditedChronicConditions)}
+                            placeholder="Enter chronic conditions separated by commas"
+                          />
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                          <Button onClick={handleSaveChronicConditions}>Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   {/* Surgeries History Section */}
@@ -650,12 +829,45 @@ export default function PatientDetailsPage() {
                     {patient.surgeriesHistory && patient.surgeriesHistory.length > 0 ? (
                       <ul className="list-disc pl-6 space-y-1">
                         {patient.surgeriesHistory.map((surgery, index) => (
-                          <li key={index} className="text-muted-foreground">{typeof surgery === 'string' ? surgery : JSON.stringify(surgery)}</li>
+                          <li key={index} className="text-muted-foreground">{surgery.name || surgery}</li>
                         ))}
                       </ul>
                     ) : (
                       <p className="text-muted-foreground italic">No surgeries history available.</p>
                     )}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditSurgeriesDialogOpen(true)}
+                      >
+                        Edit Surgeries History
+                      </Button>
+                    </div>
+
+                    {/* Edit Surgeries History Dialog */}
+                    <Dialog open={editSurgeriesDialogOpen} onOpenChange={setEditSurgeriesDialogOpen}>
+                      <DialogContent className="sm:max-w-[800px] max-w-full">
+                        <DialogHeader>
+                          <DialogTitle>Edit Surgeries History</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Label htmlFor="surgeriesHistory">Surgeries History</Label>
+                          <Input
+                            id="surgeriesHistory"
+                            value={editedSurgeries.map((item) => item.name || item).join(', ')}
+                            onChange={(e) => handleSurgeriesInputChange(e.target.value)}
+                            placeholder="Enter surgeries history separated by commas"
+                          />
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                          <Button onClick={handleSaveSurgeries}>Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   {/* Vaccination History Section */}
