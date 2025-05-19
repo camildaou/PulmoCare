@@ -301,17 +301,18 @@ export default function DoctorPatientsPage() {
                     <h3 className="font-semibold text-lg">{patient.name || `${patient.firstName} ${patient.lastName}`}</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
+                    
                     <div>
                       <span className="font-medium">Age:</span> {patient.age}
                     </div>
                     <div>
                       <span className="font-medium">Gender:</span> {patient.gender}
                     </div>
-                    <div className="col-span-2">
-                      <span className="font-medium">Condition:</span> {patient.condition}
+                    <div>
+                      <span className="font-medium">Location:</span> {patient.location}
                     </div>
                     <div className="col-span-2">
-                      <span className="font-medium">Last Visit:</span> {patient.lastVisit}
+                      <span className="font-medium">Email:</span> {patient.email}
                     </div>
                   </div>
                 </div>

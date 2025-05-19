@@ -189,8 +189,8 @@ export default function PatientsPage() {
                   Location: {patient.location || "Not provided"}
                 </div>
                 <div className="text-sm">Age: {patient.age || "Unknown"}</div>
-                <div className="text-sm">Condition: {patient.condition || "Not specified"}</div>
-                <div className="text-sm">Last Visit: {patient.lastVisit || "No record"}</div>
+                <div className="text-sm">Gender: {patient.gender || "Unknown"}</div>
+                <div className="text-sm">Email: {patient.email || "Not provided"}</div>
                 <div className="flex justify-between pt-4">
                   <Link href={`/admin/patients/${patient.id}`}>
                     <Button variant="outline" size="sm">
