@@ -10,24 +10,31 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.pulmocare.data.SessionManager
 import com.example.pulmocare.data.UserRepository
 import com.example.pulmocare.ui.screens.*
+import com.example.pulmocare.ui.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PulmoCareApp() {
-    val userRepository = remember { UserRepository() }
-    var isLoggedIn by remember { mutableStateOf(userRepository.isLoggedIn()) }
+    val context = LocalContext.current
+    val authViewModel: AuthViewModel = viewModel()
+    // Initialize authentication state
+    var isLoggedIn by remember { mutableStateOf(authViewModel.isAuthenticated()) }
+    var currentPatientId by remember { mutableStateOf(authViewModel.getCurrentPatientId()) }
 
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -77,14 +84,22 @@ fun PulmoCareApp() {
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Logout, contentDescription = null) },
                     label = { Text("Logout") },
                     selected = false,
                     onClick = {
-                        userRepository.logout()
+                        // Log out the user
+                        authViewModel.logout()
                         isLoggedIn = false
+                        currentPatientId = ""
+                        scope.launch {
+                            drawerState.close()
+                        }
+                        // Navigate to login screen
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
                     },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
@@ -166,43 +181,67 @@ fun PulmoCareApp() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-            ) {
-                NavHost(
+            ) {                NavHost(
                     navController = navController,
                     startDestination = if (isLoggedIn) Screen.Dashboard.route else Screen.Login.route
                 ) {
                     composable(Screen.Login.route) {
-                        LoginScreen(
-                            onLoginSuccess = {
-                                isLoggedIn = true
+                        // If already logged in, redirect to Dashboard
+                        if (isLoggedIn) {
+                            LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Dashboard.route) {
                                     popUpTo(Screen.Login.route) { inclusive = true }
                                 }
-                            },
-                            onNavigateToSignup = {
-                                navController.navigate(Screen.Signup.route)
                             }
-                        )
+                        } else {
+                            LoginScreen(
+                                onLoginSuccess = { patientId ->
+                                    isLoggedIn = true
+                                    currentPatientId = patientId
+                                    navController.navigate(Screen.Dashboard.route) {
+                                        popUpTo(Screen.Login.route) { inclusive = true }
+                                    }
+                                },
+                                onNavigateToSignup = {
+                                    navController.navigate(Screen.Signup.route)
+                                }
+                            )
+                        }
                     }
-
-                    composable(Screen.Signup.route) {
-                        SignupScreen(
-                            onSignupSuccess = {
-                                isLoggedIn = true
+                composable(Screen.Signup.route) {
+                        // If already logged in, redirect to Dashboard
+                        if (isLoggedIn) {
+                            LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Dashboard.route) {
                                     popUpTo(Screen.Signup.route) { inclusive = true }
                                 }
-                            },
-                            onNavigateToLogin = {
+                            }
+                        } else {
+                            SignupScreen(
+                                onSignupSuccess = { patientId ->
+                                    isLoggedIn = true
+                                    currentPatientId = patientId
+                                    navController.navigate(Screen.Dashboard.route) {
+                                        popUpTo(Screen.Signup.route) { inclusive = true }
+                                    }
+                                },
+                                onNavigateToLogin = {
+                                    navController.navigate(Screen.Login.route) {
+                                        popUpTo(Screen.Signup.route) { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                composable(Screen.Dashboard.route) {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
+                            LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Login.route) {
-                                    popUpTo(Screen.Signup.route) { inclusive = true }
+                                    popUpTo(navController.graph.id) { inclusive = true }
                                 }
                             }
-                        )
-                    }
-
-                    composable(Screen.Dashboard.route) {
-                        if (isLoggedIn) {
+                        } else {
                             DashboardScreen(
                                 onNavigateToAppointments = { navController.navigate(Screen.Appointments.route) },
                                 onNavigateToDoctors = { navController.navigate(Screen.Doctors.route) },
@@ -210,85 +249,84 @@ fun PulmoCareApp() {
                                 onNavigateToAIAssessment = { navController.navigate(Screen.AIAssessment.route) },
                                 onNavigateToProfile = { navController.navigate(Screen.Profile.route) }
                             )
-                        } else {
-                            LaunchedEffect(Unit) {
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(navController.graph.id) { inclusive = true }
-                                }
-                            }
                         }
                     }
-
-                    composable(Screen.Appointments.route) {
-                        if (isLoggedIn) {
-                            AppointmentScreen()
-                        } else {
+                composable(Screen.Appointments.route) {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
                             LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Login.route) {
                                     popUpTo(navController.graph.id) { inclusive = true }
                                 }
                             }
+                        } else {
+                            AppointmentScreen()
                         }
                     }
 
                     composable(Screen.Doctors.route) {
-                        if (isLoggedIn) {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
+                            LaunchedEffect(Unit) {
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            }
+                        } else {
                             DoctorsScreen(
                                 onBookAppointment = { doctorId ->
                                     // Navigate to appointment booking screen with doctor ID
                                     navController.navigate(Screen.Appointments.route)
                                 }
                             )
-                        } else {
-                            LaunchedEffect(Unit) {
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(navController.graph.id) { inclusive = true }
-                                }
-                            }
                         }
                     }
 
                     composable(Screen.MedicalInfo.route) {
-                        if (isLoggedIn) {
-                            MedicalInfoScreen()
-                        } else {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
                             LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Login.route) {
                                     popUpTo(navController.graph.id) { inclusive = true }
                                 }
                             }
+                        } else {
+                            MedicalInfoScreen()
                         }
                     }
 
                     composable(Screen.AIAssessment.route) {
-                        if (isLoggedIn) {
-                            AIAssessmentScreen()
-                        } else {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
                             LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Login.route) {
                                     popUpTo(navController.graph.id) { inclusive = true }
                                 }
                             }
+                        } else {
+                            AIAssessmentScreen()
                         }
                     }
-
-                    composable(Screen.Profile.route) {
-                        if (isLoggedIn) {
+                composable(Screen.Profile.route) {
+                        // Redirect to login if not authenticated
+                        if (!isLoggedIn) {
+                            LaunchedEffect(Unit) {
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            }
+                        } else {
                             ProfileScreen(
+                                patientId = currentPatientId,
                                 onLogout = {
-                                    userRepository.logout()
+                                    authViewModel.logout()
                                     isLoggedIn = false
+                                    currentPatientId = ""
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(navController.graph.id) { inclusive = true }
                                     }
                                 }
                             )
-                        } else {
-                            LaunchedEffect(Unit) {
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(navController.graph.id) { inclusive = true }
-                                }
-                            }
                         }
                     }
                 }

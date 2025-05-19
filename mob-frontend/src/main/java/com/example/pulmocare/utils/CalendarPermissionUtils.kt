@@ -11,7 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.example.pulmocare.data.Appointment
+import com.example.pulmocare.data.model.Appointment
 import com.example.pulmocare.data.GoogleCalendarHelper
 import kotlinx.coroutines.launch
 

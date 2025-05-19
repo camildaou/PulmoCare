@@ -1,7 +1,19 @@
 package com.example.pulmocare.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,21 +21,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.pulmocare.data.UserRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pulmocare.data.model.PatientSignup
 import com.example.pulmocare.ui.theme.MedicalRed
+import com.example.pulmocare.ui.viewmodel.AuthViewModel
+import java.io.ByteArrayOutputStream
 import java.util.*
 import androidx.compose.foundation.text.KeyboardOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignupScreen(
-    onSignupSuccess: () -> Unit,
+    onSignupSuccess: (String) -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
-    val userRepository = remember { UserRepository() }
+    // Use the AuthViewModel
+    val authViewModel: AuthViewModel = viewModel()
+    val signUpState by authViewModel.signUpState.collectAsState()
+    
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -37,6 +60,8 @@ fun SignupScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var acceptTerms by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var gender by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf("") }
 
     // New fields
     var bloodType by remember { mutableStateOf("") }
@@ -44,15 +69,53 @@ fun SignupScreen(
     var allergiesDetails by remember { mutableStateOf("") }
     var hasChronicConditions by remember { mutableStateOf(false) }
     var chronicConditionsDetails by remember { mutableStateOf("") }
+    var hasPets by remember { mutableStateOf(false) }
+    var isSmoking by remember { mutableStateOf(false) }
+    var maritalStatus by remember { mutableStateOf("") }
+    var occupation by remember { mutableStateOf("") }
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
 
     // Date picker state
     var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState()
-
-    // Blood type options
+    val datePickerState = rememberDatePickerState()    // Blood type options
     val bloodTypes = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
     var bloodTypeExpanded by remember { mutableStateOf(false) }
-
+    
+    // Gender options
+    val genders = listOf("Male", "Female", "Other")
+    var genderExpanded by remember { mutableStateOf(false) }
+      // Marital status options
+    val maritalStatuses = listOf("Single", "Married", "Divorced", "Widowed")
+    var maritalStatusExpanded by remember { mutableStateOf(false) }
+    
+    // Context for accessing content providers
+    val context = LocalContext.current
+    
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        photoUri = uri
+    }
+    
+    // Function to convert bitmap to base64 string
+    fun bitmapToBase64(bitmap: Bitmap): String {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
+    }
+    
+    // Get bitmap from Uri
+    fun getBitmapFromUri(uri: Uri): Bitmap {
+        return if (Build.VERSION.SDK_INT < 28) {
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        } else {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source)
+        }
+    }
+    
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -78,6 +141,25 @@ fun SignupScreen(
             }
         ) {
             DatePicker(state = datePickerState)
+        }
+    }
+      // Handle sign-up state changes
+    LaunchedEffect(signUpState) {
+        when (signUpState) {
+            is AuthViewModel.SignUpState.Success -> {
+                // Sign-up was successful, navigate to the next screen
+                val patient = (signUpState as AuthViewModel.SignUpState.Success).patient
+                onSignupSuccess(patient.id ?: "")
+                // Reset the sign-up state to prevent re-triggering this effect
+                authViewModel.resetSignUpState()
+            }
+            is AuthViewModel.SignUpState.Error -> {
+                // Show error message
+                error = (signUpState as AuthViewModel.SignUpState.Error).message
+            }
+            else -> {
+                // Do nothing for Initial and Loading states
+            }
         }
     }
 
@@ -132,10 +214,52 @@ fun SignupScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
-                    }
-
-                    // Personal Information Section
+                    }                    // Personal Information Section
                     SectionHeader(title = "Personal Information")
+
+                    // Profile Photo
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable { imagePickerLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (photoUri != null) {
+                                val bitmap = remember(photoUri) {
+                                    getBitmapFromUri(photoUri!!)
+                                }
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Profile photo",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Add profile photo",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = "Tap to add photo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // First name and last name in a row
                     Row(
@@ -297,23 +421,49 @@ fun SignupScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Contact Information Section
-                    SectionHeader(title = "Contact Information")
-
-                    OutlinedTextField(
-                        value = address,
-                        onValueChange = { address = it },
-                        label = { Text("Address") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = null
-                            )
-                        },
+                    // Gender dropdown
+                    ExposedDropdownMenuBox(
+                        expanded = genderExpanded,
+                        onExpandedChange = { genderExpanded = it },
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    ) {
+                        OutlinedTextField(
+                            value = gender,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Gender") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null
+                                )
+                            },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        ExposedDropdownMenu(
+                            expanded = genderExpanded,
+                            onDismissRequest = { genderExpanded = false }
+                        ) {
+                            genders.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        gender = option
+                                        genderExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))                    // Contact Information Section
+                    SectionHeader(title = "Contact Information")
 
                     OutlinedTextField(
                         value = phone,
@@ -331,8 +481,7 @@ fun SignupScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                    Spacer(modifier = Modifier.height(16.dp))                    
                     OutlinedTextField(
                         value = insurance,
                         onValueChange = { insurance = it },
@@ -347,7 +496,23 @@ fun SignupScreen(
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Address/Location field
+                    OutlinedTextField(
+                        value = address,
+                        onValueChange = { address = it },
+                        label = { Text("Address/Location") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     // Medical Information Section
                     SectionHeader(title = "Medical Information")
 
@@ -400,8 +565,100 @@ fun SignupScreen(
                             onValueChange = { chronicConditionsDetails = it },
                             label = { Text("Please specify your chronic conditions") },
                             modifier = Modifier.fillMaxWidth()
+                        )                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Pets section
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Do you have pets?",
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = hasPets,
+                            onCheckedChange = { hasPets = it }
                         )
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Smoking section
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Do you smoke?",
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = isSmoking,
+                            onCheckedChange = { isSmoking = it }
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Marital Status dropdown
+                    ExposedDropdownMenuBox(
+                        expanded = maritalStatusExpanded,
+                        onExpandedChange = { maritalStatusExpanded = it },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = maritalStatus,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Marital Status") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.People,
+                                    contentDescription = null
+                                )
+                            },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = maritalStatusExpanded)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = maritalStatusExpanded,
+                            onDismissRequest = { maritalStatusExpanded = false }
+                        ) {
+                            maritalStatuses.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        maritalStatus = option
+                                        maritalStatusExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Occupation field
+                    OutlinedTextField(
+                        value = occupation,
+                        onValueChange = { occupation = it },
+                        label = { Text("Occupation") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Work,
+                                contentDescription = null
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -461,7 +718,6 @@ fun SignupScreen(
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
-
                     Button(
                         onClick = {
                             // Validate inputs
@@ -474,33 +730,11 @@ fun SignupScreen(
                                 }
                                 !email.contains("@") -> {
                                     error = "Please enter a valid email"
+                                }                                gender.isBlank() -> {
+                                    error = "Please select your gender"
                                 }
                                 dateOfBirth.isBlank() -> {
-                                    error = "Please enter your date of birth"
-                                }
-                                weight.isBlank() -> {
-                                    error = "Please enter your weight"
-                                }
-                                height.isBlank() -> {
-                                    error = "Please enter your height"
-                                }
-                                bloodType.isBlank() -> {
-                                    error = "Please select your blood type"
-                                }
-                                address.isBlank() -> {
-                                    error = "Please enter your address"
-                                }
-                                phone.isBlank() -> {
-                                    error = "Please enter your phone number"
-                                }
-                                insurance.isBlank() -> {
-                                    error = "Please enter your insurance provider"
-                                }
-                                hasAllergies && allergiesDetails.isBlank() -> {
-                                    error = "Please specify your allergies"
-                                }
-                                hasChronicConditions && chronicConditionsDetails.isBlank() -> {
-                                    error = "Please specify your chronic conditions"
+                                    error = "Please select your date of birth"
                                 }
                                 password.isBlank() -> {
                                     error = "Please enter a password"
@@ -513,37 +747,67 @@ fun SignupScreen(
                                 }
                                 !acceptTerms -> {
                                     error = "You must accept the terms and conditions"
-                                }
-                                else -> {
+                                }                                else -> {
                                     // All validations passed, attempt to register
-                                    val userData = mapOf(
-                                        "firstName" to firstName,
-                                        "lastName" to lastName,
-                                        "email" to email,
-                                        "dateOfBirth" to dateOfBirth,
-                                        "weight" to weight,
-                                        "height" to height,
-                                        "bloodType" to bloodType,
-                                        "address" to address,
-                                        "phone" to phone,
-                                        "insurance" to insurance,
-                                        "allergies" to if (hasAllergies) allergiesDetails else "",
-                                        "chronicConditions" to if (hasChronicConditions) chronicConditionsDetails else ""
-                                    )
-
-                                    val success = userRepository.signup(userData)
-
-                                    if (success) {
-                                        onSignupSuccess()
+                                    // Calculate age from date of birth
+                                    val birthYear = if (dateOfBirth.isNotBlank()) {
+                                        dateOfBirth.split("-")[0].toInt()
                                     } else {
-                                        error = "Registration failed. Please try again."
+                                        0
                                     }
+                                    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+                                    val calculatedAge = currentYear - birthYear
+                                      val heightDouble = height.toDoubleOrNull() ?: 0.0
+                                    val weightDouble = weight.toDoubleOrNull() ?: 0.0
+                                    
+                                    // Convert photo to base64 if available
+                                    val photoBase64 = if (photoUri != null) {
+                                        val bitmap = getBitmapFromUri(photoUri!!)
+                                        bitmapToBase64(bitmap)
+                                    } else {
+                                        null
+                                    }
+                                    
+                                    val patientSignup = PatientSignup(
+                                        firstName = firstName,
+                                        lastName = lastName,
+                                        email = email,
+                                        password = password,
+                                        age = calculatedAge,
+                                        gender = gender,
+                                        bloodType = bloodType,
+                                        height = heightDouble,
+                                        weight = weightDouble,
+                                        location = address,
+                                        dateOfBirth = dateOfBirth,
+                                        insuranceProvider = insurance,
+                                        maritalStatus = maritalStatus,
+                                        occupation = occupation,
+                                        hasPets = hasPets,
+                                        smoking = isSmoking,
+                                        allergies = if (hasAllergies && allergiesDetails.isNotBlank()) 
+                                                       listOf(allergiesDetails) else null,
+                                        chronicConditions = if (hasChronicConditions && chronicConditionsDetails.isNotBlank()) 
+                                                               listOf(chronicConditionsDetails) else null,
+                                        photo = photoBase64
+                                    )
+                                    
+                                    // Call the AuthViewModel to sign up the patient
+                                    authViewModel.signUp(patientSignup)
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = signUpState !is AuthViewModel.SignUpState.Loading
                     ) {
-                        Text("Sign Up")
+                        if (signUpState is AuthViewModel.SignUpState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text("Sign Up")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

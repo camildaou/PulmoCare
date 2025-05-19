@@ -1,6 +1,8 @@
 package com.example.pulmocare.data
 
 import androidx.compose.runtime.mutableStateListOf
+import com.example.pulmocare.data.model.Appointment as ModelAppointment
+import com.example.pulmocare.data.model.Doctor
 import java.util.UUID
 
 data class MedicalDocument(
@@ -587,6 +589,55 @@ class MedicalRepository {
     // Function to get COPD questionnaire by appointment ID
     fun getCOPDQuestionnaireByAppointmentId(appointmentId: String): COPDQuestionnaire? {
         return copdQuestionnaires.find { it.appointmentId == appointmentId }
+    }
+
+    // Functions to convert between internal Appointment and model Appointment
+    fun convertToModelAppointment(appointment: Appointment): ModelAppointment {
+        val doctor = Doctor(
+            id = null,
+            firstName = appointment.doctor.split(" ")[1], // Assuming format "Dr. FirstName LastName"
+            lastName = appointment.doctor.split(" ").getOrElse(2) { "" },
+            specialization = appointment.specialty,
+            location = appointment.location
+        )
+
+        return ModelAppointment(
+            id = appointment.id,
+            date = appointment.date,
+            hour = appointment.time,
+            doctor = doctor,
+            location = appointment.location,
+            reason = appointment.reason,
+            diagnosis = appointment.summary?.diagnosis,
+            personalNotes = appointment.summary?.notes,
+            plan = appointment.summary?.recommendations,
+            isUpcoming = appointment.status != "completed",
+            isVaccine = false
+        )
+    }
+
+    fun convertFromModelAppointment(modelAppointment: ModelAppointment): Appointment {
+        val summary = if (modelAppointment.diagnosis != null || modelAppointment.personalNotes != null || modelAppointment.plan != null) {
+            AppointmentSummary(
+                diagnosis = modelAppointment.diagnosis ?: "",
+                notes = modelAppointment.personalNotes ?: "",
+                recommendations = modelAppointment.plan ?: "",
+                followUp = "",
+                prescriptions = emptyList()
+            )
+        } else null
+
+        return Appointment(
+            id = modelAppointment.id ?: UUID.randomUUID().toString(),
+            doctor = modelAppointment.doctor?.getFullName() ?: "",
+            specialty = modelAppointment.doctor?.specialization ?: "",
+            date = modelAppointment.date,
+            time = modelAppointment.hour,
+            location = modelAppointment.location,
+            status = if (modelAppointment.isUpcoming) "scheduled" else "completed",
+            summary = summary,
+            reason = modelAppointment.reason
+        )
     }
 }
 

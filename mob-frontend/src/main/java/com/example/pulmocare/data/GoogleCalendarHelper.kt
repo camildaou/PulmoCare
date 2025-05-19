@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract
+import com.example.pulmocare.data.model.Appointment
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,9 +26,8 @@ class GoogleCalendarHelper {
          * @param appointment The appointment to add to the calendar
          * @return An intent that can be used to start the calendar activity
          */
-        fun createAddToCalendarIntent(context: Context, appointment: Appointment): Intent {
-            // Parse the date and time to get start time in milliseconds
-            val startTime = parseDateTime(appointment.date, appointment.time)
+        fun createAddToCalendarIntent(context: Context, appointment: Appointment): Intent {            // Parse the date and time to get start time in milliseconds
+            val startTime = parseDateTime(appointment.date, appointment.hour)
             
             // Set end time to 1 hour after start time
             val endTime = startTime + (60 * 60 * 1000)
@@ -37,9 +37,9 @@ class GoogleCalendarHelper {
                 data = CalendarContract.Events.CONTENT_URI
                 putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startTime)
                 putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endTime)
-                putExtra(CalendarContract.Events.TITLE, "PulmoCare: Dr. ${appointment.doctor} (${appointment.specialty})")
+                putExtra(CalendarContract.Events.TITLE, "PulmoCare: Dr. ${appointment.doctor?.getFullName() ?: "Unknown"} (${appointment.doctor?.specialization ?: "Specialist"})")
                 putExtra(CalendarContract.Events.DESCRIPTION, 
-                    "Medical appointment with ${appointment.doctor}\n" +
+                    "Medical appointment with Dr. ${appointment.doctor?.getFullName() ?: "Unknown"}\n" +
                     "Reason: ${appointment.reason}"
                 )
                 putExtra(CalendarContract.Events.EVENT_LOCATION, appointment.location)

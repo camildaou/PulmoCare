@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.pulmocare.data.Appointment
+import com.example.pulmocare.data.model.Appointment
 import com.example.pulmocare.data.GoogleCalendarHelper
 
 /**

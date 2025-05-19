@@ -1,5 +1,6 @@
 package com.example.pulmocare.data
 
+import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 
 data class User(
@@ -19,14 +20,23 @@ data class User(
     val profileImage: String? = null
 )
 
-class UserRepository {
+class UserRepository(private val context: Context? = null) {
     // In a real app, this would use SharedPreferences, DataStore, or a database
     private val currentUser = mutableStateOf<User?>(null)
+    private val sessionManager by lazy { context?.let { SessionManager(it) } }
 
     init {
-        // For demo purposes, we'll pre-populate with a default user
+        // Check if user is already logged in via session manager
+        if (context != null && sessionManager?.isLoggedIn() == true) {
+            // In a real app, you would load the user data from local storage or from API
+            // For now, we'll set a default user
+            setDefaultUser(sessionManager!!.getPatientId())
+        }
+    }
+
+    private fun setDefaultUser(id: String) {
         currentUser.value = User(
-            id = "1",
+            id = id,
             firstName = "John",
             lastName = "Doe",
             email = "john.doe@example.com",
@@ -40,41 +50,29 @@ class UserRepository {
             allergies = "Pollen, Dust",
             chronicConditions = "Asthma"
         )
-    }
-
-    fun isLoggedIn(): Boolean {
-        return currentUser.value != null
+    }    fun isLoggedIn(): Boolean {
+        return sessionManager?.isLoggedIn() ?: (currentUser.value != null)
     }
 
     fun getCurrentUser(): User? {
         return currentUser.value
     }
 
-    fun login(email: String, password: String): Boolean {
+    fun login(email: String, password: String, patientId: String): Boolean {
         // In a real app, this would validate credentials against a backend
         // For demo purposes, we'll just set the default user
-        currentUser.value = User(
-            id = "1",
-            firstName = "John",
-            lastName = "Doe",
-            email = email,
-            dateOfBirth = "1990-01-01",
-            weight = "70",
-            height = "175",
-            bloodType = "O+",
-            address = "123 Main St, Anytown, USA",
-            phone = "555-123-4567",
-            insurance = "HealthPlus Insurance",
-            allergies = "Pollen, Dust",
-            chronicConditions = "Asthma"
-        )
+        setDefaultUser(patientId)
+        
+        // Save session data
+        sessionManager?.saveUserLoginSession(patientId)
+        
         return true
     }
 
-    fun signup(userData: Map<String, String>): Boolean {
+    fun signup(userData: Map<String, String>, patientId: String): Boolean {
         // In a real app, this would send the data to a backend
         currentUser.value = User(
-            id = System.currentTimeMillis().toString(),
+            id = patientId,
             firstName = userData["firstName"] ?: "",
             lastName = userData["lastName"] ?: "",
             email = userData["email"] ?: "",
@@ -88,12 +86,16 @@ class UserRepository {
             allergies = userData["allergies"] ?: "",
             chronicConditions = userData["chronicConditions"] ?: ""
         )
+        
+        // Save session data
+        sessionManager?.saveUserLoginSession(patientId)
+        
         return true
     }
 
-
     fun logout() {
         currentUser.value = null
+        sessionManager?.logoutUser()
     }
 }
 

@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.example.pulmocare.data.Appointment
+import com.example.pulmocare.data.model.Appointment
 import com.example.pulmocare.data.GoogleCalendarHelper
 import com.example.pulmocare.data.MedicalRepository
 import com.example.pulmocare.utils.rememberCalendarPermissionHandler
