@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,139 +9,63 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { toast } from "sonner"
-
-// Mock data for patients
-const initialPatients = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    age: 42,
-    gender: "Female",
-    phone: "555-123-4567",
-    email: "alice@example.com",
-    address: "123 Main St, Anytown, USA",
-    condition: "Asthma",
-    lastVisit: "Today",
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    age: 35,
-    gender: "Male",
-    phone: "555-234-5678",
-    email: "bob@example.com",
-    address: "456 Oak Ave, Somewhere, USA",
-    condition: "COPD",
-    lastVisit: "Yesterday",
-  },
-  {
-    id: "3",
-    name: "Carol Williams",
-    age: 28,
-    gender: "Female",
-    phone: "555-345-6789",
-    email: "carol@example.com",
-    address: "789 Pine Rd, Nowhere, USA",
-    condition: "Bronchitis",
-    lastVisit: "Mar 25, 2025",
-  },
-  {
-    id: "4",
-    name: "David Brown",
-    age: 50,
-    gender: "Male",
-    phone: "555-456-7890",
-    email: "david@example.com",
-    address: "101 Elm St, Elsewhere, USA",
-    condition: "Emphysema",
-    lastVisit: "Mar 20, 2025",
-  },
-  {
-    id: "5",
-    name: "Eve Davis",
-    age: 33,
-    gender: "Female",
-    phone: "555-567-8901",
-    email: "eve@example.com",
-    address: "202 Maple Dr, Anywhere, USA",
-    condition: "Asthma",
-    lastVisit: "Mar 15, 2025",
-  },
-  {
-    id: "6",
-    name: "Frank Miller",
-    age: 45,
-    gender: "Male",
-    phone: "555-678-9012",
-    email: "frank@example.com",
-    address: "303 Cedar Ln, Someplace, USA",
-    condition: "Chronic Bronchitis",
-    lastVisit: "Mar 10, 2025",
-  },
-  {
-    id: "7",
-    name: "Grace Lee",
-    age: 38,
-    gender: "Female",
-    phone: "555-789-0123",
-    email: "grace@example.com",
-    address: "404 Birch Blvd, Othertown, USA",
-    condition: "Asthma",
-    lastVisit: "Mar 5, 2025",
-  },
-  {
-    id: "8",
-    name: "Henry Wilson",
-    age: 55,
-    gender: "Male",
-    phone: "555-890-1234",
-    email: "henry@example.com",
-    address: "505 Walnut Way, Thisplace, USA",
-    condition: "COPD",
-    lastVisit: "Mar 1, 2025",
-  },
-]
+import { Search, Plus } from "lucide-react"
+import { doctorApi } from "@/lib/api"
+import { Patient } from "@/lib/types"
 
 export default function DoctorPatientsPage() {
-  const [patients, setPatients] = useState(initialPatients)
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [addPatientDialogOpen, setAddPatientDialogOpen] = useState(false)
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [editPatientDialogOpen, setEditPatientDialogOpen] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState(null)
-  const [newPatient, setNewPatient] = useState({
-    name: "",
-    age: "",
-    gender: "",
-    phone: "",
-    email: "",
-    address: "",
-    condition: "",
-  })
+  const [addPatientDialogOpen, setAddPatientDialogOpen] = useState(false)
 
   // State for form validation
   const [formErrors, setFormErrors] = useState({
-    name: false,
+    firstName: false,
+    lastName: false,
     age: false,
     gender: false,
-    phone: false,
     email: false,
     condition: false,
   })
 
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const response = await doctorApi.getAllPatients();
+        setPatients(response);
+      } catch (error) {
+        console.error("Error fetching patients:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPatients();
+  }, [])
+
   // Filter patients based on search query
-  const filteredPatients = patients.filter(
-    (patient) =>
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.condition.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const filteredPatients = patients.filter((patient) => {
+    const query = searchQuery.toLowerCase();
+    const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
+
+    return (
+      fullName.includes(query) ||
+      (patient.name && patient.name.toLowerCase().includes(query)) ||
+      (patient.condition && patient.condition.toLowerCase().includes(query)) ||
+      (patient.location && patient.location.toLowerCase().includes(query))
+    );
+  })
 
   // Validate the form
-  const validateForm = (patient) => {
+  const validateForm = (patient: Patient) => {
     const errors = {
-      name: !patient.name,
+      firstName: !patient.firstName,
+      lastName: !patient.lastName,
       age: !patient.age || isNaN(Number(patient.age)),
       gender: !patient.gender,
-      phone: !patient.phone,
       email: !patient.email,
       condition: !patient.condition,
     }
@@ -151,60 +75,60 @@ export default function DoctorPatientsPage() {
   }
 
   // Handle adding a new patient
-  const handleAddPatient = () => {
-    if (!validateForm(newPatient)) {
-      toast.error("Please fill in all required fields correctly")
-      return
-    }
-
-    const newPatientObj = {
-      id: (patients.length + 1).toString(),
-      ...newPatient,
-      age: Number(newPatient.age),
-      lastVisit: "Never",
-    }
-
-    setPatients([...patients, newPatientObj])
-    setAddPatientDialogOpen(false)
-    toast.success("Patient added successfully")
-
-    // Reset form
-    setNewPatient({
-      name: "",
-      age: "",
-      gender: "",
-      phone: "",
-      email: "",
-      address: "",
-      condition: "",
-    })
+  const handleAddPatient = async () => {
+    toast.error("Adding new patients is not implemented yet.")
   }
 
   // Handle editing a patient
-  const handleEditPatient = () => {
+  const handleEditPatient = async () => {
+    if (!selectedPatient) return
+    
     if (!validateForm(selectedPatient)) {
       toast.error("Please fill in all required fields correctly")
       return
     }
 
-    const updatedPatients = patients.map((patient) =>
-      patient.id === selectedPatient.id ? { ...selectedPatient, age: Number(selectedPatient.age) } : patient,
-    )
+    try {
+      // In a real implementation, this would call an API
+      // const updatedPatient = await doctorApi.updatePatient(selectedPatient.id, selectedPatient)
+      
+      // Update the local state
+      const updatedPatients = patients.map((patient) =>
+        patient.id === selectedPatient.id ? { ...selectedPatient } : patient
+      )
 
-    setPatients(updatedPatients)
-    setEditPatientDialogOpen(false)
-    toast.success("Patient updated successfully")
+      setPatients(updatedPatients)
+      setEditPatientDialogOpen(false)
+      setSelectedPatient(null)
+      toast.success("Patient updated successfully")
+    } catch (error) {
+      console.error("Error updating patient:", error)
+      toast.error("Failed to update patient")
+    }
+  }
+
+  // Open add patient dialog
+  const openAddDialog = () => {
+    setAddPatientDialogOpen(true)
+    setFormErrors({
+      firstName: false,
+      lastName: false,
+      age: false,
+      gender: false,
+      email: false,
+      condition: false,
+    })
   }
 
   // Open edit dialog with patient data
-  const openEditDialog = (patient) => {
+  const openEditDialog = (patient: Patient) => {
     setSelectedPatient({ ...patient })
     setEditPatientDialogOpen(true)
     setFormErrors({
-      name: false,
+      firstName: false,
+      lastName: false,
       age: false,
       gender: false,
-      phone: false,
       email: false,
       condition: false,
     })
@@ -219,158 +143,12 @@ export default function DoctorPatientsPage() {
         </div>
         <Button
           onClick={() => {
-            setAddPatientDialogOpen(true)
-            setFormErrors({
-              name: false,
-              age: false,
-              gender: false,
-              phone: false,
-              email: false,
-              condition: false,
-            })
+            toast.error("Adding new patients is not implemented yet.")
           }}
         >
           Add Patient
         </Button>
       </div>
-
-      {/* Add Patient Dialog */}
-      <Dialog open={addPatientDialogOpen} onOpenChange={setAddPatientDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Patient</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="flex items-center">
-                  Full Name <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="Enter patient name"
-                  value={newPatient.name}
-                  onChange={(e) => {
-                    setNewPatient({ ...newPatient, name: e.target.value })
-                    setFormErrors({ ...formErrors, name: false })
-                  }}
-                  className={formErrors.name ? "border-red-500" : ""}
-                />
-                {formErrors.name && <p className="text-red-500 text-sm">Name is required</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="age" className="flex items-center">
-                  Age <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="Enter age"
-                  value={newPatient.age}
-                  onChange={(e) => {
-                    setNewPatient({ ...newPatient, age: e.target.value })
-                    setFormErrors({ ...formErrors, age: false })
-                  }}
-                  className={formErrors.age ? "border-red-500" : ""}
-                />
-                {formErrors.age && <p className="text-red-500 text-sm">Valid age is required</p>}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="gender" className="flex items-center">
-                Gender <span className="text-red-500 ml-1">*</span>
-              </Label>
-              <Select
-                value={newPatient.gender}
-                onValueChange={(value) => {
-                  setNewPatient({ ...newPatient, gender: value })
-                  setFormErrors({ ...formErrors, gender: false })
-                }}
-              >
-                <SelectTrigger className={formErrors.gender ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-              {formErrors.gender && <p className="text-red-500 text-sm">Gender is required</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center">
-                  Phone Number <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Input
-                  id="phone"
-                  placeholder="Enter phone number"
-                  value={newPatient.phone}
-                  onChange={(e) => {
-                    setNewPatient({ ...newPatient, phone: e.target.value })
-                    setFormErrors({ ...formErrors, phone: false })
-                  }}
-                  className={formErrors.phone ? "border-red-500" : ""}
-                />
-                {formErrors.phone && <p className="text-red-500 text-sm">Phone number is required</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center">
-                  Email <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter email address"
-                  value={newPatient.email}
-                  onChange={(e) => {
-                    setNewPatient({ ...newPatient, email: e.target.value })
-                    setFormErrors({ ...formErrors, email: false })
-                  }}
-                  className={formErrors.email ? "border-red-500" : ""}
-                />
-                {formErrors.email && <p className="text-red-500 text-sm">Email is required</p>}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                placeholder="Enter address (optional)"
-                value={newPatient.address}
-                onChange={(e) => setNewPatient({ ...newPatient, address: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="condition" className="flex items-center">
-                Medical Condition <span className="text-red-500 ml-1">*</span>
-              </Label>
-              <Input
-                id="condition"
-                placeholder="Enter primary medical condition"
-                value={newPatient.condition}
-                onChange={(e) => {
-                  setNewPatient({ ...newPatient, condition: e.target.value })
-                  setFormErrors({ ...formErrors, condition: false })
-                }}
-                className={formErrors.condition ? "border-red-500" : ""}
-              />
-              {formErrors.condition && <p className="text-red-500 text-sm">Medical condition is required</p>}
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handleAddPatient}>Add Patient</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Patient Dialog */}
       <Dialog open={editPatientDialogOpen} onOpenChange={setEditPatientDialogOpen}>
@@ -382,38 +160,55 @@ export default function DoctorPatientsPage() {
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-name" className="flex items-center">
-                    Full Name <span className="text-red-500 ml-1">*</span>
+                  <Label htmlFor="edit-first-name" className="flex items-center">
+                    First Name <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Input
-                    id="edit-name"
-                    placeholder="Enter patient name"
-                    value={selectedPatient.name}
+                    id="edit-first-name"
+                    placeholder="Enter patient's first name"
+                    value={selectedPatient.firstName}
                     onChange={(e) => {
-                      setSelectedPatient({ ...selectedPatient, name: e.target.value })
-                      setFormErrors({ ...formErrors, name: false })
+                      setSelectedPatient({ ...selectedPatient, firstName: e.target.value })
+                      setFormErrors({ ...formErrors, firstName: false })
                     }}
-                    className={formErrors.name ? "border-red-500" : ""}
+                    className={formErrors.firstName ? "border-red-500" : ""}
                   />
-                  {formErrors.name && <p className="text-red-500 text-sm">Name is required</p>}
+                  {formErrors.firstName && <p className="text-red-500 text-sm">First name is required</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-age" className="flex items-center">
-                    Age <span className="text-red-500 ml-1">*</span>
+                  <Label htmlFor="edit-last-name" className="flex items-center">
+                    Last Name <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Input
-                    id="edit-age"
-                    type="number"
-                    placeholder="Enter age"
-                    value={selectedPatient.age}
+                    id="edit-last-name"
+                    placeholder="Enter patient's last name"
+                    value={selectedPatient.lastName}
                     onChange={(e) => {
-                      setSelectedPatient({ ...selectedPatient, age: e.target.value })
-                      setFormErrors({ ...formErrors, age: false })
+                      setSelectedPatient({ ...selectedPatient, lastName: e.target.value })
+                      setFormErrors({ ...formErrors, lastName: false })
                     }}
-                    className={formErrors.age ? "border-red-500" : ""}
+                    className={formErrors.lastName ? "border-red-500" : ""}
                   />
-                  {formErrors.age && <p className="text-red-500 text-sm">Valid age is required</p>}
+                  {formErrors.lastName && <p className="text-red-500 text-sm">Last name is required</p>}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-age" className="flex items-center">
+                  Age <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Input
+                  id="edit-age"
+                  type="number"
+                  placeholder="Enter age"
+                  value={selectedPatient.age}
+                  onChange={(e) => {
+                    setSelectedPatient({ ...selectedPatient, age: parseInt(e.target.value, 10) });
+                    setFormErrors({ ...formErrors, age: false });
+                  }}
+                  className={formErrors.age ? "border-red-500" : ""}
+                />
+                {formErrors.age && <p className="text-red-500 text-sm">Valid age is required</p>}
               </div>
 
               <div className="space-y-2">
@@ -441,22 +236,6 @@ export default function DoctorPatientsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-phone" className="flex items-center">
-                    Phone Number <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <Input
-                    id="edit-phone"
-                    placeholder="Enter phone number"
-                    value={selectedPatient.phone}
-                    onChange={(e) => {
-                      setSelectedPatient({ ...selectedPatient, phone: e.target.value })
-                      setFormErrors({ ...formErrors, phone: false })
-                    }}
-                    className={formErrors.phone ? "border-red-500" : ""}
-                  />
-                  {formErrors.phone && <p className="text-red-500 text-sm">Phone number is required</p>}
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="edit-email" className="flex items-center">
                     Email <span className="text-red-500 ml-1">*</span>
                   </Label>
@@ -473,16 +252,6 @@ export default function DoctorPatientsPage() {
                   />
                   {formErrors.email && <p className="text-red-500 text-sm">Email is required</p>}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-address">Address</Label>
-                <Input
-                  id="edit-address"
-                  placeholder="Enter address (optional)"
-                  value={selectedPatient.address}
-                  onChange={(e) => setSelectedPatient({ ...selectedPatient, address: e.target.value })}
-                />
               </div>
 
               <div className="space-y-2">
@@ -529,7 +298,7 @@ export default function DoctorPatientsPage() {
               <CardContent className="p-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-lg">{patient.name}</h3>
+                    <h3 className="font-semibold text-lg">{patient.name || `${patient.firstName} ${patient.lastName}`}</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -548,13 +317,9 @@ export default function DoctorPatientsPage() {
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/50 p-2 flex justify-between">
-                <Button variant="outline" size="sm" onClick={() => openEditDialog(patient)}>
-                  Edit
-                </Button>
-<Link href={`/doctor/patients/${patient.id}`}>
-  <Button variant="default" size="sm">View Details</Button>
-</Link>
-
+                <Link href={`/doctor/patients/${patient.id}`}>
+                  <Button variant="default" size="sm">View Details</Button>
+                </Link>
               </CardFooter>
             </Card>
           ))
