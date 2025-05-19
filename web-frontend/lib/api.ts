@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Patient } from './types';
 
 const api = axios.create({
   baseURL: 'http://localhost:8081/api',
@@ -22,6 +23,26 @@ export const adminApi = {
   },
   updateProfile: async (id: string, profileData: any) => {
     const response = await api.put(`/admin/profile/${id}`, profileData);
+    return response.data;
+  },
+  getPatientCount: async () => {
+    const response = await api.get('/patient/count');
+    return response.data;
+  },
+  getAllPatients: async () => {
+    const response = await api.get('/patient');
+    return response.data;
+  },
+  updatePatient: async (id: string, patientDetails: Patient) => {
+    const response = await api.put(`/patient/${id}`, patientDetails);
+    return response.data;
+  },
+  getPatientById: async (id: string) => {
+    const response = await api.get(`/patient/${id}`);
+    return response.data;
+  },
+  postPatient: async (patientDetails: Patient) => {
+    const response = await api.post('/patient', patientDetails);
     return response.data;
   },
 };
@@ -49,6 +70,10 @@ export const doctorApi = {
   },
   getDoctorCount: async () => {
     const response = await api.get('/doctors/count');
+    return response.data;
+  },
+  getAllPatients: async () => {
+    const response = await api.get('/patient');
     return response.data;
   },
 };

@@ -13,7 +13,7 @@ export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <div className={cn("pb-12 bg-blue-600 text-white", className)}> {/* Sidebar background blue */}
+    <div className={cn("pb-12 bg-primary text-white", className)}> {/* Sidebar background blue */}
       <div className="space-y-4 py-4">
         <div className="px-3 py-2">
           <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">Dashboard</h2>
@@ -22,8 +22,8 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               href="/doctor"
               className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white", // Blue hover effect
-                pathname === "/doctor" ? "bg-blue-700" : "transparent", // Highlight active link
+                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-primary hover:text-white", // Blue hover effect
+                pathname === "/doctor" ? "bg-primary" : "transparent", // Highlight active link
               )}
             >
               <Home className="mr-2 h-4 w-4" />
@@ -33,8 +33,8 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               href="/doctor/appointments"
               className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white",
-                pathname === "/doctor/appointments" || pathname.startsWith("/doctor/appointments/") ? "bg-blue-700" : "transparent",
+                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-900 hover:text-white",
+                pathname === "/doctor/appointments" || pathname.startsWith("/doctor/appointments/") ? "bg-blue-900" : "transparent",
               )}
             >
               <Calendar className="mr-2 h-4 w-4" />
@@ -85,7 +85,7 @@ export function Sidebar({ className }: SidebarProps) {
     <Link
       href="/"
       className={cn(
-        "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white"
+        "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-primary hover:text-white"
       )}
     >
       <LogOutIcon className="mr-2 h-4 w-4" />

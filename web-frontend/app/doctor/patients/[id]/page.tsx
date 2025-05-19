@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
+import { useParams } from "next/navigation"
 
-export default function PatientInfoPage({ params }: { params: { id: string } }) {
-  // In a real app, you would fetch patient data based on the ID
+export default function PatientInfoPage() {
+  const params = useParams()
+
   const patientId = params.id
 
   const [patient, setPatient] = useState({

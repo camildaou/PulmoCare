@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link"
 import { CalendarIcon, Users, BarChart3, UserIcon } from "lucide-react"
 import { useState, useEffect } from "react"
-import { doctorApi } from "@/lib/api"
+import { doctorApi, adminApi } from "@/lib/api"
 
 export default function AdminDashboard() {
   const [adminName, setAdminName] = useState("Administrator")
   const [doctorCount, setDoctorCount] = useState<number | null>(null)
+  const [patientCount, setPatientCount] = useState<number | null>(null)
 
   useEffect(() => {
     // Get user info from localStorage in client component
@@ -35,6 +36,21 @@ export default function AdminDashboard() {
     fetchDoctorCount()
   }, [])
 
+  useEffect(() => {
+    const fetchPatientCount = async () => {
+      console.log("Fetching patient count...") // Debug log
+      try {
+        const count = await adminApi.getPatientCount()
+        console.log("Patient count response:", count) // Debug log
+        setPatientCount(count)
+      } catch (error) {
+        console.error("Error fetching patient count:", error)
+      }
+    }
+
+    fetchPatientCount()
+  }, [])
+
   return (
     <div className="space-y-6">
       <div>
@@ -48,7 +64,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">248</div>
+            <div className="text-2xl font-bold">{patientCount !== null ? patientCount : "Loading..."}</div>
             <p className="text-xs text-muted-foreground">+12% from last month</p>
           </CardContent>
         </Card>

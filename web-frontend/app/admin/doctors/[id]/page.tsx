@@ -8,16 +8,23 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { doctorApi } from "@/lib/api"
 import { Doctor } from "@/lib/types"
+import { useParams } from "next/navigation"
 
-export default function DoctorInfoPage({ params }: { params: { id: string } }) {
+export default function DoctorInfoPage() {
+  const params = useParams()
+
   const [doctor, setDoctor] = useState<Doctor | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDoctor = async () => {
       try {
-        const response = await doctorApi.getProfile(params.id)
-        setDoctor(response)
+        if (typeof params.id === "string") {
+          const response = await doctorApi.getProfile(params.id)
+          setDoctor(response)
+        } else {
+          console.error("Invalid doctor ID")
+        }
       } catch (error) {
         console.error("Error fetching doctor info:", error)
       } finally {

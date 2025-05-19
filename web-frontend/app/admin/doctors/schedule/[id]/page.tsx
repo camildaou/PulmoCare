@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 
 // Mock data for doctors
 const doctors = [
@@ -34,7 +35,9 @@ const doctors = [
   },
 ]
 
-export default function DoctorSchedulePage({ params }: { params: { id: string } }) {
+export default function DoctorSchedulePage() {
+  const params = useParams()
+
   // Get doctor data based on the ID
   const [doctor, setDoctor] = useState(doctors.find((d) => d.id === params.id) || doctors[0])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())

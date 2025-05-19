@@ -7,8 +7,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 
-export default function AppointmentDetailsPage({ params }: { params: { id: string } }) {
+export default function AppointmentDetailsPage() {
+  const params = useParams()
+
   const appointmentId = params.id
   const [diagnosis, setDiagnosis] = useState("")
   const [prescription, setPrescription] = useState("")
