@@ -1,101 +1,82 @@
 "use client"
 
-import type React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { Stethoscope, CalendarIcon, Users, BarChart3, User, LogOutIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { BarChart3, Calendar, Home, Users, User, LogOutIcon } from "lucide-react"
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const routes = [
+    {
+      href: "/doctor",
+      icon: Stethoscope,
+      title: "Dashboard",
+    },
+    {
+      href: "/doctor/appointments",
+      icon: CalendarIcon,
+      title: "Appointments",
+    },
+    {
+      href: "/doctor/patients",
+      icon: Users,
+      title: "Patients",
+    },
+    {
+      href: "/doctor/analysis",
+      icon: BarChart3,
+      title: "Analysis",
+    },
+    {
+      href: "/doctor/profile",
+      icon: User,
+      title: "Profile",
+    },
+  ]
+
+  const handleLogout = () => {
+    router.push("/")
+  }
 
   return (
-    <div className={cn("pb-12 bg-primary text-white", className)}> {/* Sidebar background blue */}
-      <div className="space-y-4 py-4">
-        <div className="px-3 py-2">
-          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">Dashboard</h2>
-          <div className="space-y-1">
-            {/* Home Link */}
+    <div className="flex h-screen w-[240px] flex-col border-r bg-blue-800 text-white">
+      <div className="flex h-14 items-center border-b px-4">
+        <Link href="/doctor" className="flex items-center gap-2 font-semibold">
+          <Stethoscope className="h-6 w-6" />
+          <span>PulmoCare</span>
+        </Link>
+      </div>
+      <div className="flex-1 overflow-auto py-2">
+        <nav className="grid gap-1 px-2">
+          {routes.map((route) => (
             <Link
-              href="/doctor"
+              key={route.href}
+              href={route.href}
               className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-primary hover:text-white", // Blue hover effect
-                pathname === "/doctor" ? "bg-primary" : "transparent", // Highlight active link
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-white hover:text-blue-800 transition-all",
+                pathname === route.href ? "bg-white text-blue-800" : "transparent",
               )}
             >
-              <Home className="mr-2 h-4 w-4" />
-              <span>Home</span>
+              <route.icon className="h-5 w-5" />
+              {route.title}
             </Link>
-            {/* Appointments Link */}
-            <Link
-              href="/doctor/appointments"
-              className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-900 hover:text-white",
-                pathname === "/doctor/appointments" || pathname.startsWith("/doctor/appointments/") ? "bg-blue-900" : "transparent",
-              )}
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              <span>Appointments</span>
-            </Link>
-            {/* Patients Link */}
-            <Link
-              href="/doctor/patients"
-              className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white",
-                pathname === "/doctor/patients" || pathname.startsWith("/doctor/patients/") ? "bg-blue-700" : "transparent",
-              )}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              <span>Patients</span>
-            </Link>
-            {/* Analysis Link */}
-            <Link
-              href="/doctor/analysis"
-              className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white",
-                pathname === "/doctor/analysis" ? "bg-blue-700" : "transparent",
-              )}
-            >
-              <BarChart3 className="mr-2 h-4 w-4" />
-              <span>Analysis</span>
-            </Link>
-            {/* Profile Link */}
-            <Link
-              href="/doctor/profile"
-              className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-blue-700 hover:text-white",
-                pathname === "/doctor/profile" ? "bg-blue-700" : "transparent",
-              )}
-            >
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </Link>
-      
-          </div>
-        </div>
-        <div className={cn("flex flex-col h-full pb-12", className)}>
-  {/* Top section */}
-  
-
-  {/* Log Out button at bottom */}
-  <div className="mt-auto px-3 py-2">
-    <Link
-      href="/"
-      className={cn(
-        "flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-primary hover:text-white"
-      )}
-    >
-      <LogOutIcon className="mr-2 h-4 w-4" />
-      <span>Log Out</span>
-    </Link>
-  </div>
-</div>
-
-</div>
-
-</div>
+          ))}
+        </nav>
+      </div>
+      <div className="mt-auto p-4">
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2 bg-white text-blue-800 hover:bg-blue-700 hover:text-white"
+          onClick={handleLogout}
+        >
+          <LogOutIcon className="h-4 w-4" />
+          <span>Log Out</span>
+        </Button>
+      </div>
+    </div>
   )
 }
