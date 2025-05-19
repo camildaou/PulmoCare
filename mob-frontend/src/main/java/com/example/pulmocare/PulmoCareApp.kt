@@ -260,7 +260,7 @@ fun PulmoCareApp() {
                                 }
                             }
                         } else {
-                            AppointmentScreen()
+//                            AppointmentScreen() TODO
                         }
                     }
 
@@ -291,7 +291,7 @@ fun PulmoCareApp() {
                                 }
                             }
                         } else {
-                            MedicalInfoScreen()
+//                            MedicalInfoScreen()
                         }
                     }
 

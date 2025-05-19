@@ -76,11 +76,17 @@ object NetworkModule {
     fun patientApiService(): PatientApiService {
         return createRetrofit().create(PatientApiService::class.java)
     }
-    
-    /**
+      /**
      * Get AppointmentApiService instance
      */
     fun appointmentApiService(): AppointmentApiService {
         return createRetrofit().create(AppointmentApiService::class.java)
+    }
+    
+    /**
+     * Get DoctorApiService instance
+     */
+    fun doctorApiService(): DoctorApiService {
+        return createRetrofit().create(DoctorApiService::class.java)
     }
 }

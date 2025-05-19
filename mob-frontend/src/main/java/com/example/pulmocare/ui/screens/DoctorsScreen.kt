@@ -12,20 +12,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.pulmocare.data.Doctor
-import com.example.pulmocare.data.MedicalRepository
+import com.example.pulmocare.data.repository.Doctor
+import com.example.pulmocare.data.repository.DoctorRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorsScreen(
     onBookAppointment: (String) -> Unit
 ) {
-    val medicalRepository = remember { MedicalRepository() }
-    val doctors = remember { medicalRepository.doctors }
+    val context = LocalContext.current
+    val doctorRepository = remember { DoctorRepository(context) }
+    val doctors = remember { doctorRepository.doctors }
+    val isLoading = remember { doctorRepository.isLoading }
+    val error = remember { doctorRepository.error }
     var selectedDoctor by remember { mutableStateOf<Doctor?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Fetch doctors when the screen is first displayed
+    LaunchedEffect(key1 = true) {
+        coroutineScope.launch {
+            doctorRepository.fetchDoctors()
+        }
+    }
 
     Scaffold { paddingValues ->
         if (selectedDoctor != null) {
@@ -37,34 +50,104 @@ fun DoctorsScreen(
             )
         } else {
             // Doctors list view
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    Text(
-                        text = "Our Specialists",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                when {
+                    isLoading.value -> {
+                        // Show loading indicator
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                    error.value != null -> {
+                        // Show error message
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Error,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Error loading doctors: ${error.value}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        doctorRepository.fetchDoctors()
+                                    }
+                                }
+                            ) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                    doctors.isEmpty() -> {
+                        // Show empty state
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No doctors available",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                    else -> {
+                        // Show doctors list
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "Our Specialists",
+                                    style = MaterialTheme.typography.headlineMedium
+                                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = "Find the right specialist for your respiratory health needs",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                                Text(
+                                    text = "Find the right specialist for your respiratory health needs",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
 
-                items(doctors) { doctor ->
-                    DoctorCard(
-                        doctor = doctor,
-                        onClick = { selectedDoctor = doctor }
-                    )
+                            items(doctors) { doctor ->
+                                DoctorCard(
+                                    doctor = doctor,
+                                    onClick = { selectedDoctor = doctor }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -111,26 +194,6 @@ fun DoctorCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = "${doctor.rating} (${doctor.reviews} reviews)",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -218,25 +281,6 @@ fun DoctorDetailScreen(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = "${doctor.rating} (${doctor.reviews} reviews)",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
