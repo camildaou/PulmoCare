@@ -1,8 +1,11 @@
 package com.example.pulmocare.ui.screens
 
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -19,9 +22,12 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Arrangement.SpaceBetween
+import androidx.compose.foundation.layout.Arrangement.spacedBy
+import androidx.compose.foundation.layout.FlowRow
 import coil.compose.AsyncImage
 import com.example.pulmocare.data.repository.AppointmentRepository
-import com.example.pulmocare.data.repository.Doctor
+import com.example.pulmocare.data.model.Doctor
 import com.example.pulmocare.data.repository.DoctorRepository
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -41,24 +47,25 @@ fun AppointmentScreen() {
     val error = remember { doctorRepository.error }
     
     var showScheduleDialog by remember { mutableStateOf(false) }
+    var availableTimeSlots by remember { mutableStateOf<List<String>>(emptyList()) }
     var showCancelDialog by remember { mutableStateOf(false) }
     var appointmentToCancel by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(0) } // 0 for upcoming, 1 for past
     
     // For doctor selection and appointment scheduling
-    var selectedDoctor by remember { mutableStateOf<Doctor?>(null) }
+    var selectedDoctor by remember { mutableStateOf<com.example.pulmocare.data.model.Doctor?>(null) }
     var schedulingStep by remember { mutableStateOf(0) } // 0 = select doctor, 1 = select date/time, 2 = confirm
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf("") }
     var appointmentReason by remember { mutableStateOf("") }
     
     val coroutineScope = rememberCoroutineScope()
-    
-    // Fetch doctors when the screen is first displayed
-    LaunchedEffect(key1 = true) {
+      // Fetch doctors and appointments when the screen loads
+    LaunchedEffect(Unit) {
         coroutineScope.launch {
-            doctorRepository.fetchDoctors()
+            doctorRepository.fetchAllDoctors()
             appointmentRepository.fetchAppointmentsForCurrentPatient()
+            Log.d("AppointmentScreen", "Loaded initial doctors and appointments data")
         }
     }
     
@@ -213,39 +220,85 @@ fun AppointmentScreen() {
                 }
             }
         }
-    }
-      // Schedule appointment dialog
+    }    // Schedule appointment dialog
     if (showScheduleDialog) {
         ScheduleAppointmentDialog(
             onDismiss = { showScheduleDialog = false },
-            doctors = doctors,
+            doctors = doctorRepository.getModelDoctors(),
             isLoading = isLoading.value,
             error = error.value,
-            selectedDoctor = selectedDoctor,
-            onDoctorSelected = { selectedDoctor = it; schedulingStep = 1 },
+            selectedDoctor = selectedDoctor,            onDoctorSelected = { doctor -> 
+                selectedDoctor = doctor
+                // Fetch time slots for the selected doctor
+                coroutineScope.launch {
+                    availableTimeSlots = doctorRepository.getTimeSlotsByDoctorAndDay(doctor.id ?: "", selectedDate)
+                    Log.d("AppointmentScreen", "Fetched ${availableTimeSlots.size} time slots for newly selected doctor")
+                }
+                schedulingStep = 1
+            },
             schedulingStep = schedulingStep,
             selectedDate = selectedDate,
-            onDateSelected = { selectedDate = it },
+//            onDateSelected = { selectedDate = it },
             selectedTime = selectedTime,
-            onTimeSelected = { selectedTime = it },
-            availableTimes = selectedDoctor?.availableTimes?.get(getDayOfWeek(selectedDate)) ?: emptyList(),
-            appointmentReason = appointmentReason,
-            onReasonChanged = { appointmentReason = it },
-            onScheduleAppointment = {
+            onTimeSelected = { selectedTime = it },                
+            availableTimes = availableTimeSlots,
+            onDateSelected = { newDate ->
+                selectedDate = newDate
+                // Fetch time slots directly from the backend when date changes
                 coroutineScope.launch {
-                    selectedDoctor?.id?.let { doctorId -> 
-                        appointmentRepository.scheduleAppointment(
-                            doctorId = doctorId,
-                            date = selectedDate.format(DateTimeFormatter.ISO_DATE),
-                            time = selectedTime,
-                            reason = appointmentReason
-                        )
-                        // Reset and close dialog
-                        showScheduleDialog = false
-                        schedulingStep = 0
+                    selectedDoctor?.id?.let { doctorId ->
+                        val slots = doctorRepository.getTimeSlotsByDoctorAndDay(doctorId, selectedDate)
+                        availableTimeSlots = slots
+                        Log.d("AppointmentScreen", "Fetched ${slots.size} time slots for doctor $doctorId on $selectedDate")
                     }
                 }
             },
+            appointmentReason = appointmentReason,
+            onReasonChanged = { appointmentReason = it },
+            onScheduleAppointment = {
+    coroutineScope.launch {
+        selectedDoctor?.let { doctor ->
+            val formattedDate = selectedDate.format(DateTimeFormatter.ISO_DATE)
+            val startTime = selectedTime.split(" - ")[0].trim()
+            
+            Log.d("AppointmentScreen", "Scheduling appointment:")
+            Log.d("AppointmentScreen", "- Doctor: ${doctor.id} (${doctor.firstName} ${doctor.lastName})")
+            Log.d("AppointmentScreen", "- Date: $formattedDate")
+            Log.d("AppointmentScreen", "- Time: $startTime (from slot: $selectedTime)")
+            Log.d("AppointmentScreen", "- Day of week: ${selectedDate.dayOfWeek.toString().toLowerCase().substring(0, 3)}")
+            Log.d("AppointmentScreen", "- Reason: $appointmentReason")
+            Log.d("AppointmentScreen", "- Doctor available days: ${doctor.availableDays}")
+            Log.d("AppointmentScreen", "- Doctor time slots: ${doctor.availableTimeSlots}")
+              val result = appointmentRepository.scheduleAppointment(
+                doctor = doctor,
+                date = formattedDate,
+                time = selectedTime, // Send the full time slot string
+                reason = appointmentReason
+            )
+            
+            result.onSuccess { appointment ->
+                // Show success message
+                Toast.makeText(context, "Appointment scheduled successfully!", Toast.LENGTH_SHORT).show()
+                
+                // Update local state to avoid double-booking
+                // Refresh the doctor list to get updated availability
+                coroutineScope.launch {
+                    doctorRepository.fetchAllDoctors()
+                    appointmentRepository.fetchAppointmentsForCurrentPatient()
+                    Log.d("AppointmentScreen", "Refreshed doctor and appointment data after scheduling")
+                }
+                
+                // Reset and close dialog
+                showScheduleDialog = false
+                schedulingStep = 0
+            }.onFailure { error ->
+                // Show error message
+                Toast.makeText(context, "Failed to schedule: ${error.message}", Toast.LENGTH_LONG).show()
+                Log.e("AppointmentScreen", "Failed to schedule appointment", error)
+            }
+        }
+    }
+},
             onBackPressed = {
                 when (schedulingStep) {
                     0 -> showScheduleDialog = false
@@ -356,7 +409,7 @@ fun AppointmentCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ScheduleAppointmentDialog(
     onDismiss: () -> Unit,
@@ -493,49 +546,86 @@ fun ScheduleAppointmentDialog(
                         
                         // Time selection
                         Text(
-                            text = "Select Time:",
-                            style = MaterialTheme.typography.titleMedium
+                            text = "Available Time Slots:",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                   
+                    // Time slot selection with refresh option
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Available Time Slots:",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                          // Add refresh button to allow manual refresh of doctor availability
+                        IconButton(onClick = {
+                            selectedDoctor?.id?.let { doctorId ->
+                                Log.d("AppointmentScreen", "Manually refreshing doctor time slots")
+                                // Directly call the refreshed endpoint
+                                onDateSelected(selectedDate) // This will trigger the time slot fetch
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh time slots",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    if (availableTimes.isEmpty()) {
+                        Text(
+                            text = "No available times for selected date",
+                            color = MaterialTheme.colorScheme.error
+                        )                    } else {
+                        // Add a note about the time slot duration
+                        Text(
+                            text = "All appointments are 30-minute slots",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        if (availableTimes.isEmpty()) {
-                            Text(
-                                text = "No available times for selected date",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        } else {
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                maxItemsInEachRow = 3
-                            ) {
-                                availableTimes.forEach { time -> 
-                                    val isSelected = time == selectedTime
-                                    
-                                    Surface(
-                                        shape = MaterialTheme.shapes.small,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                                                else MaterialTheme.colorScheme.surface,
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary 
-                                                   else MaterialTheme.colorScheme.outline
+                        // Display available time slots in a grid for better visibility
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            maxItemsInEachRow = 3
+                        ) {
+                            // Each time slot is a 30-minute block (validated in backend)
+                            availableTimes.forEach { time -> 
+                                val isSelected = time == selectedTime
+                                
+                                Surface(
+                                    shape = MaterialTheme.shapes.small,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+                                            else MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        width = 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.outline
+                                    ),
+                                    onClick = { onTimeSelected(time) }
+                                ) {
+                                    Text(
+                                        text = time,
+                                        modifier = Modifier.padding(
+                                            horizontal = 12.dp,
+                                            vertical = 8.dp
                                         ),
-                                        onClick = { onTimeSelected(time) }
-                                    ) {
-                                        Text(
-                                            text = time,
-                                            modifier = Modifier.padding(
-                                                horizontal = 12.dp,
-                                                vertical = 8.dp
-                                            )
-                                        )
-                                    }
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
                             }
                         }
+                    }
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
@@ -557,17 +647,16 @@ fun ScheduleAppointmentDialog(
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
-                        
-                        AppointmentDetailItem(
-                            icon = Icons.Default.Person,
-                            label = "Doctor",
-                            value = selectedDoctor?.name ?: ""
-                        )
+                          AppointmentDetailItem(
+                        icon = Icons.Default.Schedule,
+                        label = "Time",
+                        value = selectedTime
+                    )
                         
                         AppointmentDetailItem(
                             icon = Icons.Default.MedicalServices,
                             label = "Specialty",
-                            value = selectedDoctor?.specialty ?: ""
+                            value = selectedDoctor?.specialization ?: ""
                         )
                         
                         AppointmentDetailItem(
@@ -576,11 +665,6 @@ fun ScheduleAppointmentDialog(
                             value = selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))
                         )
                         
-                        AppointmentDetailItem(
-                            icon = Icons.Default.Schedule,
-                            label = "Time",
-                            value = selectedTime
-                        )
                         
                         AppointmentDetailItem(
                             icon = Icons.Default.LocationOn,
@@ -594,6 +678,37 @@ fun ScheduleAppointmentDialog(
                                 label = "Reason",
                                 value = appointmentReason
                             )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Availability warning
+                        if (selectedDoctor != null && selectedTime.isNotEmpty()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    
+                                    Text(
+                                        text = "This appointment will be scheduled for a 30-minute slot. Please arrive on time.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -661,27 +776,26 @@ fun DoctorSelectionItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = doctor.image,
-                contentDescription = "Doctor's photo",
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+//            AsyncImage(
+//                model = doctor.image,
+//                contentDescription = "Doctor's photo",
+//                modifier = Modifier
+//                    .size(56.dp)
+//                    .clip(CircleShape),
+//                contentScale = ContentScale.Crop
+//            )
             
             Spacer(modifier = Modifier.width(16.dp))
             
             Column(
                 modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = doctor.name,
+            ) {                Text(
+                    text = doctor.firstName + " " + doctor.lastName,
                     style = MaterialTheme.typography.titleMedium
                 )
                 
                 Text(
-                    text = doctor.specialty,
+                    text = doctor.specialization,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -697,13 +811,35 @@ fun DoctorSelectionItem(
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))
-                    
-                    Text(
-                        text = doctor.location,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                          Text(
+                    text = doctor.location,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Display availability days
+                if (doctor.availableDays.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Text(
+                            text = "Available: ${doctor.availableDays.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            }
             }
             
             if (isSelected) {
@@ -822,3 +958,15 @@ fun getDayOfWeek(date: LocalDate): String {
     return date.dayOfWeek.toString().take(3)
 }
 
+// Helper function to split doctor's time slots into 30-minute increments
+fun splitInto30MinuteSlots(timeSlots: List<Doctor.TimeSlot>): List<String> {
+    Log.d("AppointmentScreen", "Processing time slots: $timeSlots")
+    
+    val formattedSlots = timeSlots.map { "${it.startTime} - ${it.endTime}" }
+    Log.d("AppointmentScreen", "Formatted time slots for display: $formattedSlots")
+    
+    // The backend expects time slots to be exactly 30 minutes
+    // TimeSlot objects are already validated in the Doctor class to be 30-min slots
+    // The validator ensures each time slot is exactly 30 minutes (endTime - startTime = 30min)
+    return formattedSlots
+}

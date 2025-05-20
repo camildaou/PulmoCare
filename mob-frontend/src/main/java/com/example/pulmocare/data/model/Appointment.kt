@@ -36,6 +36,6 @@ data class Appointment(
     @SerializedName("upcoming")
     val isUpcoming: Boolean = true, // true if upcoming, false if past
     
-    @SerializedName("vaccine")
+    @SerializedName("isVaccine")
     val isVaccine: Boolean = false // true if this is a vaccine appointment
 )

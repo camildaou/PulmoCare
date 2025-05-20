@@ -9,6 +9,7 @@ import com.example.pulmocare.data.model.Doctor as ModelDoctor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.time.LocalDate
 
 data class Doctor(
     val id: String,
@@ -49,8 +50,7 @@ class DoctorRepository(private val context: Context? = null) {
             withContext(Dispatchers.IO) {
                 val response = doctorApiService.getAllDoctors()
                 if (response.isSuccessful) {
-                    response.body()?.let { backendDoctors ->
-                        // Convert backend doctor model to UI doctor model
+                    response.body()?.let { backendDoctors ->                        // Convert backend doctor model to UI doctor model
                         val uiDoctors = backendDoctors.map { backendDoctor ->
                             // Convert the backend doctor to our UI model
                             Doctor(
@@ -59,17 +59,18 @@ class DoctorRepository(private val context: Context? = null) {
                                 specialty = backendDoctor.specialization.orEmpty().ifEmpty { "General Physician" },
                                 rating = 4.8, // Default value or could be fetched from backend
                                 reviews = 100, // Default value or could be fetched from backend
-                                availability = listOf("Mon", "Wed", "Fri"), // Default value or could be fetched from backend
+                                availability = backendDoctor.availableDays.map { day ->
+                                    // Capitalize first letter and show first 3 letters
+                                    day.replaceFirstChar { it.uppercase() }.take(3)
+                                },
                                 location = backendDoctor.location.orEmpty().ifEmpty { "Not specified" },
                                 phone = backendDoctor.phone.orEmpty().ifEmpty { "Not available" },
                                 email = backendDoctor.email.orEmpty().ifEmpty { "Not available" },
                                 image = backendDoctor.photo ?: "https://via.placeholder.com/100",
                                 bio = backendDoctor.description.orEmpty().ifEmpty { "No description available" },
-                                availableTimes = mapOf( // Default value or could be fetched from backend
-                                    "Mon" to listOf("9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"),
-                                    "Wed" to listOf("10:00 AM", "11:00 AM", "1:00 PM", "4:00 PM"),
-                                    "Fri" to listOf("9:00 AM", "11:00 AM", "2:00 PM", "3:00 PM")
-                                )
+                                availableTimes = backendDoctor.availableTimeSlots.mapValues { (_, timeSlots) ->
+                                    timeSlots.map { slot -> "${slot.startTime} - ${slot.endTime}" }
+                                }
                             )
                         }
                         
@@ -103,25 +104,25 @@ class DoctorRepository(private val context: Context? = null) {
             return withContext(Dispatchers.IO) {
                 val response = doctorApiService.getDoctorById(id)
                 if (response.isSuccessful) {
-                    response.body()?.let { backendDoctor ->
-                        // Convert the backend doctor to our UI model
+                    response.body()?.let { backendDoctor ->                        // Convert the backend doctor to our UI model
                         Doctor(
                             id = backendDoctor.id ?: "",
                             name = "Dr. ${backendDoctor.firstName.orEmpty().trim()} ${backendDoctor.lastName.orEmpty().trim()}",
                             specialty = backendDoctor.specialization.orEmpty().ifEmpty { "General Physician" },
                             rating = 4.8, // Default value or could be fetched from backend
                             reviews = 100, // Default value or could be fetched from backend
-                            availability = listOf("Mon", "Wed", "Fri"), // Default value or could be fetched from backend
+                            availability = backendDoctor.availableDays.map { day ->
+                                // Capitalize first letter and show first 3 letters
+                                day.replaceFirstChar { it.uppercase() }.take(3)
+                            },
                             location = backendDoctor.location.orEmpty().ifEmpty { "Not specified" },
                             phone = backendDoctor.phone.orEmpty().ifEmpty { "Not available" },
                             email = backendDoctor.email.orEmpty().ifEmpty { "Not available" },
                             image = backendDoctor.photo ?: "https://via.placeholder.com/100",
                             bio = backendDoctor.description.orEmpty().ifEmpty { "No description available" },
-                            availableTimes = mapOf( // Default value or could be fetched from backend
-                                "Mon" to listOf("9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"),
-                                "Wed" to listOf("10:00 AM", "11:00 AM", "1:00 PM", "4:00 PM"),
-                                "Fri" to listOf("9:00 AM", "11:00 AM", "2:00 PM", "3:00 PM")
-                            )
+                            availableTimes = backendDoctor.availableTimeSlots.mapValues { (_, timeSlots) ->
+                                timeSlots.map { slot -> "${slot.startTime} - ${slot.endTime}" }
+                            }
                         )
                     }
                 } else {
@@ -148,6 +149,38 @@ class DoctorRepository(private val context: Context? = null) {
     fun getDoctorById(id: String): Doctor? {
         return doctors.find { it.id == id }
     }
+    /**
+ * Convert repository Doctor objects to model Doctor objects
+ * Used for compatibility with appointment scheduling
+ */
+fun getModelDoctors(): List<ModelDoctor> {
+    return doctors.map { repoDoctor ->
+        ModelDoctor(
+            id = repoDoctor.id,
+            firstName = repoDoctor.name.split(" ").firstOrNull() ?: "",
+            lastName = repoDoctor.name.split(" ").drop(1).joinToString(" "),
+            specialization = repoDoctor.specialty,
+            location = repoDoctor.location,
+            email = repoDoctor.email,
+            phone = repoDoctor.phone,
+            description = repoDoctor.bio,
+            photo = repoDoctor.image,
+            availableDays = repoDoctor.availability,
+            // Convert the string-based time slots to the TimeSlot model
+            availableTimeSlots = repoDoctor.availableTimes.mapValues { (_, times) ->
+                times.map { timeString ->
+                    val parts = timeString.split(" - ")
+                    if (parts.size == 2) {
+                        ModelDoctor.TimeSlot(startTime = parts[0], endTime = parts[1])
+                    } else {
+                        // Default to a 30-minute slot if format is unexpected
+                        ModelDoctor.TimeSlot(startTime = timeString, endTime = timeString)
+                    }
+                }
+            }
+        )
+    }
+}
     
     // Function to get available appointment times for a doctor on a specific date
     fun getAvailableTimesForDoctor(doctorId: String, date: String): List<String> {
@@ -168,22 +201,207 @@ class DoctorRepository(private val context: Context? = null) {
         // Get available times for that day
         return doctor.availableTimes[dayOfWeek] ?: emptyList()
     }
-    
-    // Function to convert between backend Doctor model and UI Doctor model if needed
+      // Function to convert between backend Doctor model and UI Doctor model if needed
     fun convertToModelDoctor(doctor: Doctor): ModelDoctor {
-        // Split the name safely with null handling
+        // Split the name into first and last name
         val nameParts = doctor.name.split(" ")
         
         return ModelDoctor(
             id = doctor.id,
-            firstName = nameParts.getOrElse(1) { "" }, // Assuming format "Dr. FirstName LastName"
-            lastName = nameParts.getOrElse(2) { "" },
+            firstName = nameParts.firstOrNull() ?: "",
+            lastName = nameParts.drop(1).joinToString(" "),
             specialization = doctor.specialty,
             location = doctor.location,
             description = doctor.bio,
             email = doctor.email,
             phone = doctor.phone,
-            photo = doctor.image
+            photo = doctor.image,
+            availableDays = doctor.availability,
+            // Convert the string-based time slots to the TimeSlot model
+            availableTimeSlots = doctor.availableTimes.mapValues { (_, times) ->
+                times.map { timeString ->
+                    val parts = timeString.split(" - ")
+                    if (parts.size == 2) {
+                        ModelDoctor.TimeSlot(startTime = parts[0], endTime = parts[1])
+                    } else {
+                        // Default to a 30-minute slot if format is unexpected
+                        ModelDoctor.TimeSlot(startTime = timeString, endTime = timeString)
+                    }
+                }
+            }
         )
+    }
+    
+    // Method to get doctor availability
+    suspend fun getDoctorAvailability(doctorId: String) {
+        _isLoading.value = true
+        _error.value = null
+        
+        try {
+            withContext(Dispatchers.IO) {
+                val response = doctorApiService.getDoctorAvailability(doctorId)
+                if (response.isSuccessful) {
+                    response.body()?.let { availabilityData ->
+                        // Process availability data if needed
+                        Log.d(TAG, "Successfully fetched doctor availability")
+                    }
+                } else {
+                    // Handle error response
+                    Log.e(TAG, "Error fetching doctor availability: ${response.errorBody()?.string()}")
+                    _error.value = "Failed to fetch doctor availability: ${response.code()}"
+                }
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error fetching doctor availability", e)
+            _error.value = "Network error: ${e.message}"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching doctor availability", e)
+            _error.value = "Error: ${e.message}"
+        } finally {
+            _isLoading.value = false
+        }
+    }
+    
+    // Method to set standard schedule for a doctor
+    suspend fun setStandardSchedule(doctorId: String, workDays: List<String>, workHours: Map<String, String>) {
+        _isLoading.value = true
+        _error.value = null
+        
+        try {
+            withContext(Dispatchers.IO) {
+                val scheduleDetails = mapOf(
+                    "workDays" to workDays,
+                    "workHours" to workHours
+                )
+                
+                val response = doctorApiService.setStandardSchedule(doctorId, scheduleDetails)
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Successfully set standard schedule for doctor")
+                } else {
+                    // Handle error response
+                    Log.e(TAG, "Error setting standard schedule: ${response.errorBody()?.string()}")
+                    _error.value = "Failed to set standard schedule: ${response.code()}"
+                }
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error setting standard schedule", e)
+            _error.value = "Network error: ${e.message}"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting standard schedule", e)
+            _error.value = "Error: ${e.message}"
+        } finally {
+            _isLoading.value = false
+        }
+    }
+    
+    // Method to add a time slot for a doctor
+    suspend fun addTimeSlot(doctorId: String, day: String, startTime: String, endTime: String) {
+        _isLoading.value = true
+        _error.value = null
+        
+        try {
+            withContext(Dispatchers.IO) {
+                val timeSlotDetails = mapOf(
+                    "day" to day,
+                    "startTime" to startTime,
+                    "endTime" to endTime
+                )
+                
+                val response = doctorApiService.addTimeSlot(doctorId, timeSlotDetails)
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Successfully added time slot for doctor")
+                } else {
+                    // Handle error response
+                    Log.e(TAG, "Error adding time slot: ${response.errorBody()?.string()}")
+                    _error.value = "Failed to add time slot: ${response.code()}"
+                }
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error adding time slot", e)
+            _error.value = "Network error: ${e.message}"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding time slot", e)
+            _error.value = "Error: ${e.message}"
+        } finally {
+            _isLoading.value = false
+        }
+    }
+      // Method to remove a time slot for a doctor
+    suspend fun removeTimeSlot(doctorId: String, day: String, startTime: String) {
+        _isLoading.value = true
+        _error.value = null
+        
+        try {
+            withContext(Dispatchers.IO) {
+                val response = doctorApiService.removeTimeSlot(doctorId, day, startTime)
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Successfully removed time slot for doctor")
+                } else {
+                    // Handle error response
+                    Log.e(TAG, "Error removing time slot: ${response.errorBody()?.string()}")
+                    _error.value = "Failed to remove time slot: ${response.code()}"
+                }
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error removing time slot", e)
+            _error.value = "Network error: ${e.message}"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error removing time slot", e)
+            _error.value = "Error: ${e.message}"
+        } finally {
+            _isLoading.value = false
+        }
+    }
+      /**
+     * Refresh all doctors data from the backend
+     * This should be called after creating an appointment to get updated availability
+     */
+    suspend fun fetchAllDoctors() {
+        return fetchDoctors()
+    }
+    
+    /**
+     * Get available time slots for a doctor on a specific date
+     * This method fetches 30-minute time slots directly from the backend
+     */
+    suspend fun getTimeSlotsByDoctorAndDay(doctorId: String, date: LocalDate): List<String> {
+        _isLoading.value = true
+        val result = mutableListOf<String>()
+        
+        try {
+            val dayOfWeek = date.dayOfWeek.toString().toLowerCase().substring(0, 3)
+            Log.d(TAG, "Fetching time slots for doctor $doctorId on $date ($dayOfWeek)")
+            
+            val response = doctorApiService.getDoctorAvailability(doctorId)
+            if (response.isSuccessful && response.body() != null) {
+                val availabilityData = response.body()!!
+                
+                @Suppress("UNCHECKED_CAST")
+                val availableTimeSlots = availabilityData["availableTimeSlots"] as? Map<String, List<Map<String, String>>>
+                
+                if (availableTimeSlots != null) {
+                    val dayTimeSlots = availableTimeSlots[dayOfWeek] ?: emptyList()
+                    
+                    // Convert the backend format to our display format
+                    for (slot in dayTimeSlots) {
+                        val startTime = slot["startTime"]
+                        val endTime = slot["endTime"]
+                        if (startTime != null && endTime != null) {
+                            result.add("$startTime - $endTime")
+                        }
+                    }
+                    
+                    Log.d(TAG, "Retrieved ${result.size} time slots for $dayOfWeek: $result")
+                }
+            } else {
+                Log.e(TAG, "Error fetching time slots: ${response.errorBody()?.string()}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching time slots", e)
+        } finally {
+            _isLoading.value = false
+        }
+        
+        return result
     }
 }

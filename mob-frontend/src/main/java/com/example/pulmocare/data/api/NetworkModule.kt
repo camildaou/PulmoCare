@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 /**
@@ -28,7 +29,8 @@ object NetworkModule {
     
     /**
      * Create OkHttpClient with proper logging and timeouts
-     */    private fun createOkHttpClient(): OkHttpClient {
+     */
+    private fun createOkHttpClient(): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = if (ENABLE_LOGS) 
                 HttpLoggingInterceptor.Level.BODY 
@@ -47,7 +49,8 @@ object NetworkModule {
                 } catch (e: Exception) {
                     Log.e(TAG, "Network error: ${e.message}")
                     throw e
-                }            }
+                }
+            }
             .connectTimeout(30, TimeUnit.SECONDS) // Increased timeout
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -66,6 +69,7 @@ object NetworkModule {
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(createOkHttpClient())
+            .addConverterFactory(ScalarsConverterFactory.create()) // Add this for string responses
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
@@ -76,7 +80,8 @@ object NetworkModule {
     fun patientApiService(): PatientApiService {
         return createRetrofit().create(PatientApiService::class.java)
     }
-      /**
+    
+    /**
      * Get AppointmentApiService instance
      */
     fun appointmentApiService(): AppointmentApiService {
@@ -88,5 +93,12 @@ object NetworkModule {
      */
     fun doctorApiService(): DoctorApiService {
         return createRetrofit().create(DoctorApiService::class.java)
+    }
+    
+    /**
+     * Get ChatbotApiService instance
+     */
+    fun chatbotApiService(): ChatbotApiService {
+        return createRetrofit().create(ChatbotApiService::class.java)
     }
 }

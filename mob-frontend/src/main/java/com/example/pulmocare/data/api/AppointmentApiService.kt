@@ -82,4 +82,24 @@ interface AppointmentApiService {
      */
     @PATCH("api/appointments/{id}/mark-past")
     suspend fun markAppointmentAsPast(@Path("id") id: String): Response<Appointment>
+    
+    /**
+     * Check if a specific time slot is available for a doctor on a date
+     */
+    @GET("api/doctors/{doctorId}/availability/check")
+    suspend fun checkTimeSlotAvailability(
+        @Path("doctorId") doctorId: String,
+        @Query("date") date: String,
+        @Query("startTime") startTime: String,
+        @Query("endTime") endTime: String
+    ): Response<Map<String, Any>>
+    
+    /**
+     * Get available time slots for a doctor on a specific date
+     */
+    @GET("api/doctors/{doctorId}/availability/slots")
+    suspend fun getAvailableTimeSlots(
+        @Path("doctorId") doctorId: String,
+        @Query("date") date: String
+    ): Response<Map<String, Any>>
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 
@@ -24,6 +25,7 @@ import java.util.Locale
  */
 class AppointmentRepository(private val context: Context? = null) {
     private val appointmentApiService = NetworkModule.appointmentApiService()
+    private val doctorApiService = NetworkModule.doctorApiService()
     private val TAG = "AppointmentRepository"
     
     // In-memory cache of appointments
@@ -35,6 +37,10 @@ class AppointmentRepository(private val context: Context? = null) {
 
     private val _currentAppointment = mutableStateOf<Appointment?>(null)
     val currentAppointment: Appointment? get() = _currentAppointment.value
+
+    // In-memory cache for doctor availability
+    private val _availableTimeSlots = mutableStateListOf<Doctor.TimeSlot>()
+    val availableTimeSlots: List<Doctor.TimeSlot> = _availableTimeSlots
 
     private val sessionManager by lazy { context?.let { SessionManager(it) } }
     
@@ -108,7 +114,34 @@ class AppointmentRepository(private val context: Context? = null) {
             Log.e(TAG, "Error creating appointment", e)
             emit(Result.failure(e))
         }
-    }    /**
+    }
+
+    /**
+     * Create a new appointment with time slot validation
+     */
+    fun createAppointmentWithValidation(appointment: Appointment): Flow<Result<Appointment>> = flow {
+        try {
+            // First validate the appointment time slot
+            validateAppointmentTimeSlot(appointment).collect { validationResult ->
+                if (validationResult.isSuccess && validationResult.getOrNull() == true) {
+                    // Time slot is available, proceed with creating the appointment
+                    createAppointment(appointment).collect { creationResult ->
+                        emit(creationResult)
+                    }
+                } else if (validationResult.isSuccess) {
+                    // Time slot is not available
+                    emit(Result.failure(IllegalArgumentException("The selected time slot is not available")))
+                } else {
+                    // Validation failed with an error
+                    emit(Result.failure(validationResult.exceptionOrNull() ?: Exception("Unknown error during validation")))
+                }
+            }
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
+    /**
      * Get appointment by ID from API
      */
     fun fetchAppointmentById(id: String): Flow<Result<Appointment>> = flow {
@@ -145,6 +178,43 @@ class AppointmentRepository(private val context: Context? = null) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error updating appointment", e)
+            emit(Result.failure(e))
+        }
+    }
+
+    /**
+     * Update an appointment with time slot validation
+     * This checks if the new time slot is available before updating
+     */
+    fun updateAppointmentWithValidation(id: String, appointment: Appointment): Flow<Result<Appointment>> = flow {
+        try {
+            // Validate the new appointment time slot only if date or hour has changed
+            val currentAppointment = _upcomingAppointments.find { it.id == id } ?: _pastAppointments.find { it.id == id }
+            
+            if (currentAppointment != null && 
+                (currentAppointment.date != appointment.date || currentAppointment.hour != appointment.hour)) {
+                // Date or time has changed, validate the new slot
+                validateAppointmentTimeSlot(appointment).collect { validationResult ->
+                    if (validationResult.isSuccess && validationResult.getOrNull() == true) {
+                        // Time slot is available, proceed with updating the appointment
+                        updateAppointment(id, appointment).collect { updateResult ->
+                            emit(updateResult)
+                        }
+                    } else if (validationResult.isSuccess) {
+                        // Time slot is not available
+                        emit(Result.failure(IllegalArgumentException("The selected time slot is not available")))
+                    } else {
+                        // Validation failed with an error
+                        emit(Result.failure(validationResult.exceptionOrNull() ?: Exception("Unknown error during validation")))
+                    }
+                }
+            } else {
+                // No change in date/time or appointment not found locally, proceed with update without validation
+                updateAppointment(id, appointment).collect { updateResult ->
+                    emit(updateResult)
+                }
+            }
+        } catch (e: Exception) {
             emit(Result.failure(e))
         }
     }
@@ -200,50 +270,139 @@ class AppointmentRepository(private val context: Context? = null) {
     /**
      * Schedule a new appointment
      */
-    suspend fun scheduleAppointment(
-        doctorId: String,
-        date: String,
-        time: String,
-        reason: String
-    ): Appointment? {
-        val patientId = sessionManager?.getPatientId() ?: return null
-        
-        // Get doctor info to include location
-        val doctorInfo = getDoctorInfo(doctorId)
-        
-        // Create appointment object
-        val newAppointment = Appointment(
-            date = date,
-            hour = time,
-            doctor = Doctor(id = doctorId),
-            patient = Patient(id = patientId),
-            reason = reason,
-            location = doctorInfo?.location ?: "Clinic",
-            isUpcoming = true
-        )
-        
-        // Call the API to create the appointment
-        var createdAppointment: Appointment? = null
+suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reason: String): Result<Appointment> {
+    return withContext(Dispatchers.IO) {
         try {
-            withContext(Dispatchers.IO) {
-                val response = appointmentApiService.createAppointment(newAppointment)
-                if (response.isSuccessful) {
-                    response.body()?.let { appointment ->
-                        // Add to local cache
-                        _upcomingAppointments.add(appointment)
-                        createdAppointment = appointment
-                    }
-                } else {
-                    Log.e(TAG, "Error scheduling appointment: ${response.errorBody()?.string()}")
-                }
+            // Extract just the start time from the time slot
+            val startTime = time.split(" - ")[0].trim()
+            
+            Log.d("AppointmentRepository", "Scheduling appointment:")
+            Log.d("AppointmentRepository", "- Doctor ID: ${doctor.id}")
+            Log.d("AppointmentRepository", "- Date: $date")
+            Log.d("AppointmentRepository", "- Time slot: $time")
+            Log.d("AppointmentRepository", "- Start time: $startTime")
+            
+            // Create a simplified doctor object with only the ID to avoid validation issues
+            val appointment = Appointment(
+                date = date,
+                hour = startTime,
+                patient = Patient(id = sessionManager?.getPatientId()),
+                doctor = Doctor(id = doctor.id),
+                reason = reason
+            )
+            
+            val response = appointmentApiService.createAppointment(appointment)
+            if (response.isSuccessful && response.body() != null) {
+                // Refresh local appointment data
+                fetchAppointmentsForCurrentPatient()
+                Log.d("AppointmentRepository", "Appointment scheduled successfully: ${response.body()?.id}")
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Log.e("AppointmentRepository", "Error scheduling appointment: $errorBody")
+                Result.failure(RuntimeException("Failed to schedule appointment: $errorBody"))
+            }        
+            } catch (e: Exception) {
+            Log.e("AppointmentRepository", "Error scheduling appointment", e)
+            Result.failure(e)
+        }
+    }
+}
+
+    /**
+     * Validate appointment time slot against doctor availability before creating
+     * This should be called before creating an appointment
+     */
+    suspend fun validateAppointmentTimeSlot(appointment: Appointment): Flow<Result<Boolean>> = flow {
+        try {
+            // Extract doctor ID, date, and time from appointment
+            val doctorId = appointment.doctor?.id ?: throw IllegalArgumentException("Doctor ID is required")
+            val date = appointment.date
+            val hour = appointment.hour
+            
+            // Calculate end time (30 minutes after start time)
+            val hourParts = hour.split(":")
+            val hourInt = hourParts[0].toInt()
+            val minuteInt = hourParts[1].toInt()
+            
+            val endHour = if (minuteInt + 30 >= 60) hourInt + 1 else hourInt
+            val endMinute = (minuteInt + 30) % 60
+            val endTime = String.format("%02d:%02d", endHour, endMinute)
+            
+            // Check availability
+            checkTimeSlotAvailability(doctorId, date, hour, endTime).collect { result ->
+                emit(result)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling appointment", e)
+            emit(Result.failure(e))
         }
-        
-        return createdAppointment
     }
-      /**
+
+    /**
+     * Check if a specific time slot is available for a doctor on a date
+     */
+    suspend fun checkTimeSlotAvailability(doctorId: String, date: String, startTime: String, endTime: String): Flow<Result<Boolean>> = flow {
+        try {
+            val response = appointmentApiService.checkTimeSlotAvailability(doctorId, date, startTime, endTime)
+            if (response.isSuccessful) {
+                response.body()?.let { data ->
+                    val isAvailable = data["available"] as Boolean
+                    emit(Result.success(isAvailable))
+                } ?: emit(Result.failure(IOException("No data received")))
+            } else {
+                emit(Result.failure(IOException("Error checking time slot availability: ${response.errorBody()?.string()}")))
+            }
+        } catch (e: IOException) {
+            emit(Result.failure(IOException("Network error checking time slot availability", e)))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }    /**
+     * Get available time slots for a doctor on a specific date
+     */
+    // Update this method in AppointmentRepository
+    suspend fun getAvailableTimeSlots(doctorId: String, date: LocalDate): List<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val dateStr = date.toString() // Convert LocalDate to String in ISO format (YYYY-MM-DD)
+                val response = appointmentApiService.getAvailableTimeSlots(doctorId, dateStr)
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val responseBody = response.body()!!
+                    val availableSlots = responseBody["availableSlots"] as? List<String> ?: emptyList()
+                    return@withContext availableSlots
+                }
+                emptyList()
+            } catch (e: Exception) {
+                Log.e("AppointmentRepository", "Error getting available time slots", e)
+                emptyList()
+            }
+        }
+    }
+
+    /**
+     * Get available time slots for a specific doctor and date
+     */
+    suspend fun getDoctorAvailableTimeSlots(doctorId: String, date: String): Flow<Result<List<Map<String, String>>>> = flow {
+        try {
+            val response = appointmentApiService.getAvailableTimeSlots(doctorId, date)
+            if (response.isSuccessful) {
+                response.body()?.let { responseBody ->
+                    val availableSlots = responseBody["availableSlots"] as? List<Map<String, String>> ?: emptyList()
+                    emit(Result.success(availableSlots))
+                } ?: emit(Result.success(emptyList()))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Unknown error"
+                Log.e(TAG, "Error fetching time slots: $errorMessage")
+                emit(Result.failure(IOException("Failed to fetch time slots: $errorMessage")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching available time slots", e)
+            emit(Result.failure(e))
+        }
+    }
+
+    /**
      * Get doctor information by ID
      * This helper method is used to get doctor details when scheduling an appointment
      */
@@ -329,7 +488,8 @@ class AppointmentRepository(private val context: Context? = null) {
         
         return rescheduledAppointment
     }
-      /**
+
+    /**
      * Find an appointment by ID from local cache
      */
     fun findAppointmentById(id: String): Appointment? {
@@ -367,6 +527,39 @@ class AppointmentRepository(private val context: Context? = null) {
             _currentAppointment.value = updatedAppointment
         }
     }
+    // Add this method to generate 30-minute time slots from a doctor's availability
+private fun generateTimeSlots(timeSlots: List<Doctor.TimeSlot>): List<String> {
+    val slots = mutableListOf<String>()
+    
+    timeSlots.forEach { slot ->
+        // Parse start and end times
+        val startParts = slot.startTime.split(":")
+        val endParts = slot.endTime.split(":")
+        
+        if (startParts.size == 2 && endParts.size == 2) {
+            val startHour = startParts[0].toIntOrNull() ?: return@forEach
+            val startMinute = startParts[1].toIntOrNull() ?: return@forEach
+            val endHour = endParts[0].toIntOrNull() ?: return@forEach
+            val endMinute = endParts[1].toIntOrNull() ?: return@forEach
+            
+            // Calculate total minutes for start and end
+            val startTotalMinutes = startHour * 60 + startMinute
+            val endTotalMinutes = endHour * 60 + endMinute
+            
+            // Generate 30-minute slots
+            var currentMinutes = startTotalMinutes
+            while (currentMinutes < endTotalMinutes) {
+                val hour = currentMinutes / 60
+                val minute = currentMinutes % 60
+                slots.add(String.format("%02d:%02d", hour, minute))
+                currentMinutes += 30
+            }
+        }
+    }
+    
+    return slots
+}
+
 
     /**
      * Save a COPD questionnaire for a specific appointment

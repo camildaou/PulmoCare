@@ -2,6 +2,7 @@ package com.example.pulmocare.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import coil.compose.AsyncImage
 import com.example.pulmocare.data.repository.Doctor
 import com.example.pulmocare.data.repository.DoctorRepository
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Arrangement
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,6 +214,50 @@ fun DoctorCard(
                         text = doctor.location,
                         style = MaterialTheme.typography.bodySmall
                     )
+                }
+                
+                // Show availability days
+                if (doctor.availability.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            doctor.availability.take(3).forEach { day ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = MaterialTheme.shapes.extraSmall
+                                ) {
+                                    Text(
+                                        text = day,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                            
+                            if (doctor.availability.size > 3) {
+                                Text(
+                                    text = "+${doctor.availability.size - 3}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -408,6 +454,72 @@ fun DoctorDetailScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
+                    }
+                }
+                
+                // Show available time slots if any
+                if (doctor.availableTimes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "Available Time Slots",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Group time slots by day
+                    doctor.availableTimes.entries.take(3).forEach { (day, slots) ->
+                        Column {
+                            Text(
+                                text = day.replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                              Spacer(modifier = Modifier.height(4.dp))
+                            
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(slots.take(5)) { timeSlot ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        shape = MaterialTheme.shapes.small
+                                    ) {
+                                        Text(
+                                            text = timeSlot,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                                
+                                if (slots.size > 5) {
+                                    item {
+                                        Text(
+                                            text = "+${slots.size - 5} more",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                    
+                    if (doctor.availableTimes.size > 3) {
+                        Text(
+                            text = "... and ${doctor.availableTimes.size - 3} more days",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
 
