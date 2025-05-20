@@ -341,54 +341,10 @@ public class DoctorController {
             if (workDaySlots == null || workDaySlots.isEmpty()) {
                 return ResponseEntity.ok(Map.of("availableSlots", new java.util.ArrayList<>()));
             }
-            
-            // Determine working hours boundary
-            LocalTime startWorkingHour = null;
-            LocalTime endWorkingHour = null;
-            
-            for (Doctor.TimeSlot slot : workDaySlots) {
-                String[] startParts = slot.getStartTime().split(":");
-                LocalTime slotStartTime = LocalTime.of(
-                    Integer.parseInt(startParts[0]), 
-                    Integer.parseInt(startParts[1])
-                );
-                
-                String[] endParts = slot.getEndTime().split(":");
-                LocalTime slotEndTime = LocalTime.of(
-                    Integer.parseInt(endParts[0]), 
-                    Integer.parseInt(endParts[1])
-                );
-                
-                if (startWorkingHour == null || slotStartTime.isBefore(startWorkingHour)) {
-                    startWorkingHour = slotStartTime;
-                }
-                
-                if (endWorkingHour == null || slotEndTime.isAfter(endWorkingHour)) {
-                    endWorkingHour = slotEndTime;
-                }
-            }
-            
-            // Generate all possible 30-minute slots for this day within working hours
-            List<Doctor.TimeSlot> allSlots = new java.util.ArrayList<>();
-            LocalTime currentTime = startWorkingHour;
-
-            if (currentTime != null && endWorkingHour != null) {
-                while (currentTime.plusMinutes(30).compareTo(endWorkingHour) <= 0) {
-                    String currentTimeStr = String.format("%02d:%02d", currentTime.getHour(), currentTime.getMinute());
-                    String nextTimeStr = String.format("%02d:%02d", 
-                                                  currentTime.plusMinutes(30).getHour(), 
-                                                  currentTime.plusMinutes(30).getMinute());
-                    
-                    try {
-                        Doctor.TimeSlot slot = new Doctor.TimeSlot(currentTimeStr, nextTimeStr);
-                        allSlots.add(slot);
-                    } catch (IllegalArgumentException e) {
-                        // Skip invalid slots
-                    }
-                    
-                    currentTime = currentTime.plusMinutes(30);
-                }
-            }
+              // Use the doctor's actual defined time slots rather than generating all possible slots
+            // This fixes the bug where time slots were being incorrectly merged
+            // (e.g., if doctor has 10:30-11:00 and 12:30-1:00, it was incorrectly creating all slots between 10:30 and 1:00)
+            List<Doctor.TimeSlot> allSlots = new java.util.ArrayList<>(workDaySlots);
             
             // Get existing appointments for this date
             List<Appointment> existingAppointments = appointmentService.getAppointmentsByDoctorAndDate(id, localDate);
