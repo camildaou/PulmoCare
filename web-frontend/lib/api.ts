@@ -87,12 +87,12 @@ export const scheduleApi = {
     const response = await api.put(`/doctors/${doctorId}/availability`, availabilityDetails);
     return response.data;
   },
-  fetchWeeklySchedule: async (doctorId: string) => {
-    const response = await api.get(`/doctors/${doctorId}/availability/slots`);
-    return response.data;
-  },
   addTimeSlot: async (doctorId: string, timeSlotDetails: any) => {
     const response = await api.post(`/doctors/${doctorId}/availability/timeslot`, timeSlotDetails);
+    return response.data;
+  },
+  getDoctorAvailability: async (doctorId: string) => {
+    const response = await api.get(`/doctors/${doctorId}/availability`);
     return response.data;
   },
 };

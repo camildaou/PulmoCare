@@ -6,8 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { scheduleApi } from "@/lib/api";
 import dynamic from "next/dynamic";
 import { Select } from "@/components/ui/select"; // Import a Select component for day selection
+import { useToast } from "@/hooks/use-toast"; // Import the toast hook
 
-const workingDays = ["mon", "tue", "wed", "thu", "fri"]; // Updated working days to lowercase format
+const workingDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]; // Full day names for display
+
+const dayNameMap: Record<string, string> = {
+  Monday: "mon",
+  Tuesday: "tue",
+  Wednesday: "wed",
+  Thursday: "thu",
+  Friday: "fri",
+}; // Map full day names to short names
+
+const allTimeSlots = Array.from({ length: 16 }, (_, i) => {
+  const hour = Math.floor(i / 2) + 9;
+  const minute = (i % 2) * 30;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+});
 
 const ScheduleManagement = dynamic(
   () =>
@@ -18,6 +33,7 @@ const ScheduleManagement = dynamic(
         appointments: { time: string; patientName: string }[];
         availableSlots: string[];
       }[]>([]);
+      const [isLoading, setIsLoading] = useState(true); // Add loading state
 
       const handleScheduleChange = (newSchedule: {
         availableDates: Date | undefined;
@@ -90,44 +106,61 @@ const ScheduleManagement = dynamic(
           return;
         }
 
-        const selectedDays = Object.keys(schedule);
-        if (selectedDays.length === 0) {
-          console.error("No days selected to save schedule.");
-          return;
-        }
-
         const availabilityDetails = {
-          availableDays: selectedDays,
-          availableTimeSlots: schedule, // Send selected days and their time slots to the backend
+          availableDays: weeklySchedule.map((day) => dayNameMap[day.date]), // Convert full day names to short names
+          availableTimeSlots: Object.fromEntries(
+            weeklySchedule.map((day) => [
+              dayNameMap[day.date], // Convert full day names to short names
+              day.availableSlots.map((slot) => {
+                const [startTime, endTime] = slot.split(" - ");
+                return { startTime, endTime };
+              }),
+            ])
+          ),
         };
 
-        console.log("Payload being sent to the backend:", availabilityDetails); // Log the payload for debugging
+        console.log("Payload being sent to the backend:", JSON.stringify(availabilityDetails, null, 2)); // Log the payload in a readable format
 
         try {
-          const response = await scheduleApi.saveAvailability(
-            doctorId,
-            availabilityDetails
-          );
+          const response = await scheduleApi.saveAvailability(doctorId, availabilityDetails);
           console.log("Schedule saved successfully:", response);
+          alert("Your schedule has been saved successfully.");
         } catch (error) {
           console.error("Error saving schedule:", error);
+          alert("There was an error saving your schedule. Please try again.");
         }
       };
 
       useEffect(() => {
-        // TODO: Fetch weekly schedule from the backend
-        // Example structure for weeklySchedule:
-        // [
-        //   {
-        //     date: "2025-05-20",
-        //     appointments: [
-        //       { time: "09:00", patientName: "John Doe" },
-        //       { time: "10:30", patientName: "Jane Smith" },
-        //     ],
-        //     availableSlots: ["09:30", "11:00", "11:30"],
-        //   },
-        // ]
+        const fetchWeeklySchedule = async () => {
+          const doctorId = localStorage.getItem("pulmocare_doctor_id");
+          if (!doctorId) {
+            console.error("Doctor ID is not available in localStorage.");
+            return;
+          }
+
+          try {
+            const availability = await scheduleApi.getDoctorAvailability(doctorId);
+            console.log("Doctor availability response:", availability); // Log the availability data structure
+            const formattedSchedule = Object.keys(availability.availableTimeSlots).map((day) => ({
+              date: Object.keys(dayNameMap).find((key) => dayNameMap[key] === day) || day, // Convert short day names to full names
+              availableSlots: availability.availableTimeSlots[day].map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`),
+              appointments: [], // Assuming appointments are not part of the response
+            }));
+            setWeeklySchedule(formattedSchedule);
+          } catch (error) {
+            console.error("Error fetching weekly schedule:", error);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        fetchWeeklySchedule();
       }, []);
+
+      if (isLoading) {
+        return <div>Loading...</div>; // Render a loading spinner or placeholder during data fetch
+      }
 
       return (
         <div className="p-6 space-y-6">
@@ -169,34 +202,23 @@ const ScheduleManagement = dynamic(
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">
-                Weekly Schedule
-              </CardTitle>
+              <CardTitle className="text-2xl font-bold">Weekly Schedule</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {weeklySchedule.map((day) => (
-                  <div key={day.date} className="border-b pb-4 mb-4">
-                    <h3 className="text-lg font-semibold">
-                      {new Date(day.date).toDateString()}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {day.appointments.map((appointment) => (
-                        <div
-                          key={appointment.time}
-                          className="bg-red-500 text-white p-2 rounded"
-                        >
-                          {appointment.time} - {appointment.patientName}
-                        </div>
-                      ))}
-                      {day.availableSlots.map((slot) => (
-                        <div
-                          key={slot}
-                          className="bg-green-500 text-white p-2 rounded"
-                        >
-                          {slot}
-                        </div>
-                      ))}
+                  <div key={day.date} className="mb-6">
+                    <h3 className="font-semibold text-lg mb-2">{day.date}</h3>
+                    <div className="flex space-x-4">
+                      {day.availableSlots.length > 0 ? (
+                        day.availableSlots.map((slot, index) => (
+                          <div key={index} className="text-sm text-center py-1 px-2 rounded bg-green-200">
+                            {slot}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500">No available slots</div>
+                      )}
                     </div>
                   </div>
                 ))}

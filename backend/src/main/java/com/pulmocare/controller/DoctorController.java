@@ -371,21 +371,23 @@ public class DoctorController {
             // Generate all possible 30-minute slots for this day within working hours
             List<Doctor.TimeSlot> allSlots = new java.util.ArrayList<>();
             LocalTime currentTime = startWorkingHour;
-            
-            while (currentTime.plusMinutes(30).compareTo(endWorkingHour) <= 0) {
-                String currentTimeStr = String.format("%02d:%02d", currentTime.getHour(), currentTime.getMinute());
-                String nextTimeStr = String.format("%02d:%02d", 
-                                              currentTime.plusMinutes(30).getHour(), 
-                                              currentTime.plusMinutes(30).getMinute());
-                
-                try {
-                    Doctor.TimeSlot slot = new Doctor.TimeSlot(currentTimeStr, nextTimeStr);
-                    allSlots.add(slot);
-                } catch (IllegalArgumentException e) {
-                    // Skip invalid slots
+
+            if (currentTime != null && endWorkingHour != null) {
+                while (currentTime.plusMinutes(30).compareTo(endWorkingHour) <= 0) {
+                    String currentTimeStr = String.format("%02d:%02d", currentTime.getHour(), currentTime.getMinute());
+                    String nextTimeStr = String.format("%02d:%02d", 
+                                                  currentTime.plusMinutes(30).getHour(), 
+                                                  currentTime.plusMinutes(30).getMinute());
+                    
+                    try {
+                        Doctor.TimeSlot slot = new Doctor.TimeSlot(currentTimeStr, nextTimeStr);
+                        allSlots.add(slot);
+                    } catch (IllegalArgumentException e) {
+                        // Skip invalid slots
+                    }
+                    
+                    currentTime = currentTime.plusMinutes(30);
                 }
-                
-                currentTime = currentTime.plusMinutes(30);
             }
             
             // Get existing appointments for this date
