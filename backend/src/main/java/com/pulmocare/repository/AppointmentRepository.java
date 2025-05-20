@@ -29,6 +29,12 @@ public interface AppointmentRepository extends MongoRepository<Appointment, Stri
     
     // Find past appointments by doctor
     List<Appointment> findByDoctorIdAndUpcomingFalse(String doctorId);
+
+    // Find all upcoming appointments
+    List<Appointment> findByUpcomingTrue();
+    
+    // Find all past appointments
+    List<Appointment> findByUpcomingFalse();
     
     // Find appointments by date
     List<Appointment> findByDate(LocalDate date);

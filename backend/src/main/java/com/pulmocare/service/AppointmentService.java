@@ -76,6 +76,7 @@ public class AppointmentService {
      * Get upcoming appointments by patient ID
      */
     public List<Appointment> getUpcomingAppointmentsByPatientId(String patientId) {
+        updateAppointmentStatuses();
         return appointmentRepository.findByPatientIdAndUpcomingTrue(patientId);
     }
     
@@ -83,6 +84,7 @@ public class AppointmentService {
      * Get past appointments by patient ID
      */
     public List<Appointment> getPastAppointmentsByPatientId(String patientId) {
+        updateAppointmentStatuses();
         return appointmentRepository.findByPatientIdAndUpcomingFalse(patientId);
     }
     
@@ -98,6 +100,30 @@ public class AppointmentService {
      */
     public List<Appointment> getPastAppointmentsByDoctorId(String doctorId) {
         return appointmentRepository.findByDoctorIdAndUpcomingFalse(doctorId);
+    }
+       /**
+     * Update appointment statuses based on current date and time
+     * This method automatically marks appointments as past if their date/time has passed
+     */
+    public void updateAppointmentStatuses() {
+        // Get current date and time
+        LocalDate currentDate = LocalDate.now();
+        LocalTime currentTime = LocalTime.now();
+        
+        // Get all upcoming appointments
+        List<Appointment> upcomingAppointments = appointmentRepository.findByUpcomingTrue();
+        
+        // Check each appointment to see if it's in the past
+        for (Appointment appointment : upcomingAppointments) {
+            if (appointment.getDate().isBefore(currentDate) || 
+                (appointment.getDate().isEqual(currentDate) && 
+                 appointment.getHour().isBefore(currentTime))) {
+                // Mark as past
+                appointment.setUpcoming(false);
+                appointmentRepository.save(appointment);
+                System.out.println("Marked appointment " + appointment.getId() + " as past");
+            }
+        }
     }
     
     /**
@@ -221,8 +247,7 @@ public class AppointmentService {
         Doctor doctor = appointment.getDoctor();
         LocalDate date = appointment.getDate();
         LocalTime startTime = appointment.getHour();
-        
-        // Calculate end time (30 minutes later) if not provided
+          // Calculate end time (30 minutes later) if not provided
         LocalTime endTime;
         String endTimeStr;
         

@@ -1,7 +1,9 @@
 package com.example.pulmocare.data.repository
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import com.example.pulmocare.data.SessionManager
@@ -17,6 +19,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.time.LocalTime
 import java.util.Date
 import java.util.Locale
 
@@ -46,11 +49,10 @@ class AppointmentRepository(private val context: Context? = null) {
     
     // In-memory cache of COPD questionnaires
     private val _copdQuestionnaires = mutableStateListOf<COPDQuestionnaire>()
-    val copdQuestionnaires: List<COPDQuestionnaire> = _copdQuestionnaires
-
-    /**
+    val copdQuestionnaires: List<COPDQuestionnaire> = _copdQuestionnaires    /**
      * Fetch all appointments for the current patient
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun fetchAppointmentsForCurrentPatient() {
         val patientId = sessionManager?.getPatientId() ?: return
         fetchAppointmentsForPatient(patientId)
@@ -59,14 +61,47 @@ class AppointmentRepository(private val context: Context? = null) {
     /**
      * Fetch appointments for a specific patient
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun fetchAppointmentsForPatient(patientId: String) {
         withContext(Dispatchers.IO) {
             try {
                 val upcomingResponse = appointmentApiService.getUpcomingAppointmentsByPatientId(patientId)
                 if (upcomingResponse.isSuccessful) {
                     upcomingResponse.body()?.let { appointments ->
+                        // Check if any "upcoming" appointments are actually in the past
+                        val currentDate = LocalDate.now()
+                        val currentTime = LocalTime.now()
+                        
+                        val (actuallyUpcoming, shouldBePast) = appointments.partition { appointment ->
+                            val appointmentDate = LocalDate.parse(appointment.date)
+                            
+                            when {
+                                appointmentDate.isAfter(currentDate) -> true // Future date
+                                appointmentDate.isBefore(currentDate) -> false // Past date
+                                else -> { // Same date, check time
+                                    try {
+                                        val appointmentTime = LocalTime.parse(appointment.hour)
+                                        appointmentTime.isAfter(currentTime)
+                                    } catch (e: Exception) {
+                                        // If we can't parse the time, assume it's upcoming
+                                        true
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Update the actually upcoming appointments
                         _upcomingAppointments.clear()
-                        _upcomingAppointments.addAll(appointments)
+                        _upcomingAppointments.addAll(actuallyUpcoming)
+                        
+                        // Mark appointments that should be past as past
+                        shouldBePast.forEach { appointment ->
+                            try {
+                                markAppointmentAsPast(appointment.id!!)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error marking appointment ${appointment.id} as past", e)
+                            }
+                        }
                     }
                 } else {
                     Log.e(TAG, "Error fetching upcoming appointments: ${upcomingResponse.errorBody()?.string()}")
@@ -270,12 +305,29 @@ class AppointmentRepository(private val context: Context? = null) {
     /**
      * Schedule a new appointment
      */
+@RequiresApi(Build.VERSION_CODES.O)
 suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reason: String): Result<Appointment> {
     return withContext(Dispatchers.IO) {
         try {
+            // Validate appointment is in the future
+            val selectedDate = LocalDate.parse(date)
+            val currentDate = LocalDate.now()
+            
             // Extract start time and end time from the time slot string
             val timeParts = time.split(" - ")
             val startTime = timeParts[0].trim()
+            
+            // Validate time is in the future if date is today
+            if (selectedDate.isEqual(currentDate)) {
+                val currentTime = LocalTime.now()
+                val appointmentTime = LocalTime.parse(startTime)
+                
+                if (appointmentTime.isBefore(currentTime)) {
+                    return@withContext Result.failure(RuntimeException("Cannot schedule an appointment in the past. Please select a future time."))
+                }
+            } else if (selectedDate.isBefore(currentDate)) {
+                return@withContext Result.failure(RuntimeException("Cannot schedule an appointment for a past date. Please select a future date."))
+            }
             
             // Calculate end time if it's not in the format or add proper formatting if it is
             val endTime = if (timeParts.size > 1) {

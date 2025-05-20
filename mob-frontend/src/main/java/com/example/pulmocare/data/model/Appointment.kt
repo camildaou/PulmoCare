@@ -12,6 +12,7 @@ data class Appointment(
       // Schedule information
     val date: String, // In ISO format: YYYY-MM-DD
     val hour: String, // In format: HH:MM (start time)
+    @SerializedName("endTimeStr")
     val endTime: String? = null, // In format: HH:MM (end time)
     
     // References to patient and doctor

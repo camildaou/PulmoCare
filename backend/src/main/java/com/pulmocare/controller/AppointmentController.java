@@ -218,4 +218,19 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * Update appointment statuses based on current date/time
+     * Useful for manually updating appointment statuses
+     */
+    @PostMapping("/update-statuses")
+    public ResponseEntity<String> updateAppointmentStatuses() {
+        try {
+            appointmentService.updateAppointmentStatuses();
+            return new ResponseEntity<>("Appointment statuses updated successfully", HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error updating appointment statuses: " + e.getMessage(), 
+                                       HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
