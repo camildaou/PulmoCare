@@ -469,4 +469,104 @@ public class DoctorController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    
+    // Remove a specific time slot
+    @DeleteMapping("/{id}/availability/remove-timeslot")
+    public ResponseEntity<?> DrRemoveTimeSlot(
+            @PathVariable String id,
+            @RequestParam String day,
+            @RequestParam String startTime) {
+        try {
+            Doctor doctor = doctorService.getDoctorById(id);
+
+            // Get the available time slots for this day
+            Map<String, List<Doctor.TimeSlot>> availableTimeSlots = doctor.getAvailableTimeSlots();
+            if (!availableTimeSlots.containsKey(day) || availableTimeSlots.get(day).isEmpty()) {
+                return ResponseEntity.badRequest().body("No time slots found for day: " + day);
+            }
+
+            List<Doctor.TimeSlot> daySlots = availableTimeSlots.get(day);
+            boolean removed = false;
+
+            // Find and remove the slot with matching start time
+            for (int i = 0; i < daySlots.size(); i++) {
+                if (daySlots.get(i).getStartTime().equals(startTime)) {
+                    daySlots.remove(i);
+                    removed = true;
+                    break;
+                }
+            }
+
+            if (!removed) {
+                return ResponseEntity.badRequest().body("Time slot not found: " + startTime);
+            }
+
+            // If this day has no more slots, remove the day from available days
+            if (daySlots.isEmpty()) {
+                availableTimeSlots.remove(day);
+                List<String> availableDays = doctor.getAvailableDays();
+                availableDays.remove(day);
+            }
+
+            // Save the updated doctor
+            Doctor updatedDoctor = doctorService.updateDoctor(id, doctor);
+            return ResponseEntity.ok(updatedDoctor);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    // Append multiple availability times
+    @PostMapping("/{id}/availability/append")
+    public ResponseEntity<?> appendAvailability(
+            @PathVariable String id,
+            @RequestBody Map<String, List<Map<String, String>>> newAvailability) {
+        try {
+            Doctor doctor = doctorService.getDoctorById(id);
+
+            // Get or initialize the available time slots
+            Map<String, List<Doctor.TimeSlot>> availableTimeSlots = doctor.getAvailableTimeSlots();
+            if (availableTimeSlots == null) {
+                availableTimeSlots = new java.util.HashMap<>();
+            }
+
+            for (Map.Entry<String, List<Map<String, String>>> entry : newAvailability.entrySet()) {
+                String day = entry.getKey();
+                List<Map<String, String>> slots = entry.getValue();
+
+                // Initialize the list for the day if it doesn't exist
+                availableTimeSlots.putIfAbsent(day, new java.util.ArrayList<>());
+
+                for (Map<String, String> slot : slots) {
+                    String startTime = slot.get("startTime");
+                    String endTime = slot.get("endTime");
+
+                    try {
+                        // Create and validate the new time slot
+                        Doctor.TimeSlot newTimeSlot = new Doctor.TimeSlot(startTime, endTime);
+
+                        // Add the new time slot if it doesn't already exist
+                        if (!availableTimeSlots.get(day).contains(newTimeSlot)) {
+                            availableTimeSlots.get(day).add(newTimeSlot);
+                        }
+                    } catch (IllegalArgumentException e) {
+                        return ResponseEntity.badRequest().body("Invalid time slot: " + e.getMessage());
+                    }
+                }
+
+                // Ensure the day is in the availableDays list
+                List<String> availableDays = doctor.getAvailableDays();
+                if (!availableDays.contains(day)) {
+                    availableDays.add(day);
+                }
+            }
+
+            // Save the updated doctor
+            doctor.setAvailableTimeSlots(availableTimeSlots);
+            Doctor updatedDoctor = doctorService.updateDoctor(id, doctor);
+            return ResponseEntity.ok(updatedDoctor);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

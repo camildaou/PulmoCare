@@ -99,35 +99,72 @@ const ScheduleManagement = dynamic(
         }
       }, []);
 
-      const saveSchedule = async () => {
-        const doctorId = localStorage.getItem("pulmocare_doctor_id"); // Retrieve doctor ID from localStorage
+      const updateWeeklySchedule = async () => {
+        const doctorId = localStorage.getItem("pulmocare_doctor_id");
         if (!doctorId) {
           console.error("Doctor ID is not available in localStorage.");
           return;
         }
 
-        const availabilityDetails = {
-          availableDays: weeklySchedule.map((day) => dayNameMap[day.date]), // Convert full day names to short names
-          availableTimeSlots: Object.fromEntries(
-            weeklySchedule.map((day) => [
-              dayNameMap[day.date], // Convert full day names to short names
-              day.availableSlots.map((slot) => {
-                const [startTime, endTime] = slot.split(" - ");
-                return { startTime, endTime };
-              }),
-            ])
-          ),
-        };
+        try {
+          const availability = await scheduleApi.getDoctorAvailability(doctorId);
+          console.log("Updated doctor availability response:", availability);
+          const formattedSchedule = Object.keys(availability.availableTimeSlots)
+            .map((day) => ({
+              date: Object.keys(dayNameMap).find((key) => dayNameMap[key] === day) || day,
+              availableSlots: availability.availableTimeSlots[day].map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`),
+              appointments: [],
+            }))
+            .sort((a, b) => workingDays.indexOf(a.date) - workingDays.indexOf(b.date)); // Ensure sorting by workingDays order
+          setWeeklySchedule(formattedSchedule);
+        } catch (error) {
+          console.error("Error updating weekly schedule:", error);
+        }
+      };
 
-        console.log("Payload being sent to the backend:", JSON.stringify(availabilityDetails, null, 2)); // Log the payload in a readable format
+      const saveSchedule = async () => {
+        const doctorId = localStorage.getItem("pulmocare_doctor_id");
+        if (!doctorId) {
+          console.error("Doctor ID is not available in localStorage.");
+          return;
+        }
+
+        const newAvailability = Object.fromEntries(
+          Object.entries(schedule).map(([day, slots]) => [
+            dayNameMap[day],
+            slots.map((slot) => ({ startTime: slot.startTime, endTime: slot.endTime })),
+          ])
+        );
+
+        console.log("Payload being sent to the backend:", JSON.stringify(newAvailability, null, 2));
 
         try {
-          const response = await scheduleApi.saveAvailability(doctorId, availabilityDetails);
-          console.log("Schedule saved successfully:", response);
-          alert("Your schedule has been saved successfully.");
+          const response = await scheduleApi.appendAvailability(doctorId, newAvailability);
+          console.log("Schedule appended successfully:", response);
+          alert("Your schedule has been updated successfully.");
+          await updateWeeklySchedule(); // Update the weekly schedule after saving
         } catch (error) {
-          console.error("Error saving schedule:", error);
-          alert("There was an error saving your schedule. Please try again.");
+          console.error("Error appending schedule:", error);
+          alert("There was an error updating your schedule. Please try again.");
+        }
+      };
+
+      const handleDeleteTimeSlot = async (day: string, startTime: string) => {
+        const doctorId = localStorage.getItem("pulmocare_doctor_id");
+        if (!doctorId) {
+          console.error("Doctor ID is not available in localStorage.");
+          return;
+        }
+
+        try {
+          const shortDay = dayNameMap[day];
+          const response = await scheduleApi.removeTimeSlot(doctorId, shortDay, startTime);
+          console.log("Time slot removed successfully:", response);
+          alert("Time slot removed successfully.");
+          await updateWeeklySchedule(); // Refresh the weekly schedule
+        } catch (error) {
+          console.error("Error removing time slot:", error);
+          alert("There was an error removing the time slot. Please try again.");
         }
       };
 
@@ -146,7 +183,8 @@ const ScheduleManagement = dynamic(
               date: Object.keys(dayNameMap).find((key) => dayNameMap[key] === day) || day, // Convert short day names to full names
               availableSlots: availability.availableTimeSlots[day].map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`),
               appointments: [], // Assuming appointments are not part of the response
-            }));
+            }))
+            .sort((a, b) => workingDays.indexOf(a.date) - workingDays.indexOf(b.date)); // Ensure sorting by workingDays order
             setWeeklySchedule(formattedSchedule);
           } catch (error) {
             console.error("Error fetching weekly schedule:", error);
@@ -212,10 +250,19 @@ const ScheduleManagement = dynamic(
                     <div className="flex space-x-4">
                       {day.availableSlots.length > 0 ? (
                         day.availableSlots.map((slot, index) => (
-                          <div key={index} className="text-sm text-center py-1 px-2 rounded bg-green-200">
-                            {slot}
-                          </div>
-                        ))
+                          <div
+                            key={index}
+                            className="text-sm text-center py-1 px-2 rounded bg-green-200 cursor-pointer hover:bg-red-200"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete the time slot ${slot}?`)) {
+                                const [startTime] = slot.split(" - ");
+                                handleDeleteTimeSlot(day.date, startTime);
+                            }
+                          }}
+                        >
+                          {slot}
+                        </div>
+                      ))
                       ) : (
                         <div className="text-sm text-gray-500">No available slots</div>
                       )}

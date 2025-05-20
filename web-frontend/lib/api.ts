@@ -95,6 +95,16 @@ export const scheduleApi = {
     const response = await api.get(`/doctors/${doctorId}/availability`);
     return response.data;
   },
+  appendAvailability: async (doctorId: string, newAvailability: any) => {
+    const response = await api.post(`/doctors/${doctorId}/availability/append`, newAvailability);
+    return response.data;
+  },
+  removeTimeSlot: async (doctorId: string, day: string, startTime: string) => {
+    const response = await api.delete(`/doctors/${doctorId}/availability/remove-timeslot`, {
+      params: { day, startTime },
+    });
+    return response.data;
+  },
 };
 
 export default api;
