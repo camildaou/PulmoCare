@@ -74,10 +74,6 @@ export default function DoctorPatientsPage() {
     return !Object.values(errors).some((error) => error)
   }
 
-  // Handle adding a new patient
-  const handleAddPatient = async () => {
-    toast.error("Adding new patients is not implemented yet.")
-  }
 
   // Handle editing a patient
   const handleEditPatient = async () => {
@@ -107,19 +103,6 @@ export default function DoctorPatientsPage() {
     }
   }
 
-  // Open add patient dialog
-  const openAddDialog = () => {
-    setAddPatientDialogOpen(true)
-    setFormErrors({
-      firstName: false,
-      lastName: false,
-      age: false,
-      gender: false,
-      email: false,
-      condition: false,
-    })
-  }
-
   // Open edit dialog with patient data
   const openEditDialog = (patient: Patient) => {
     setSelectedPatient({ ...patient })
@@ -141,13 +124,6 @@ export default function DoctorPatientsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
           <p className="text-muted-foreground">Manage your patients and their medical records.</p>
         </div>
-        <Button
-          onClick={() => {
-            toast.error("Adding new patients is not implemented yet.")
-          }}
-        >
-          Add Patient
-        </Button>
       </div>
 
       {/* Edit Patient Dialog */}

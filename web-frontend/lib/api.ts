@@ -80,6 +80,10 @@ export const doctorApi = {
     const response = await api.get('/patient');
     return response.data;
   },
+  getAppointmentsByDoctorId: async (doctorId: string) => {
+    const response = await api.get(`/appointments/doctor/${doctorId}`);
+    return response.data;
+  },
 };
 
 export const scheduleApi = {
@@ -105,6 +109,23 @@ export const scheduleApi = {
     });
     return response.data;
   },
+};
+
+export const createAppointment = async (doctorId: string, patientId: string, date: string, time: string, reason: string) => {
+  try {
+    const response = await api.post('/web-create-appt', {
+      doctorId,
+      patientId,
+      date,
+      time,
+      reason,
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error creating appointment:', error);
+    throw error;
+  }
 };
 
 export default api;

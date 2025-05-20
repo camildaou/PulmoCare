@@ -26,11 +26,10 @@ export default function DoctorAppointmentsPage() {
   // State for create appointment form
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [newAppointment, setNewAppointment] = useState({
-    patientId: "",
-    date: new Date(),
+    patient: { id: "", firstName: "", lastName: "", name: "" },
+    date: "", // Changed to string for manual input
     time: "",
     reason: "",
-    status: "Pending",
   })
 
   // State for add patient form
@@ -66,16 +65,43 @@ export default function DoctorAppointmentsPage() {
   // State for search
   const [searchQuery, setSearchQuery] = useState("")
 
+  // State for patients
+  const [patients, setPatients] = useState<
+    { id: string; name: string; firstName: string; lastName: string }[]
+  >([])
+
+  // State for available time slots
+  const [availableTimes, setAvailableTimes] = useState([])
+
+  // Predefined list of reasons
+  const reasons = [
+    "Routine Check-up",
+    "Follow-up Appointment",
+    "Respiratory Issues",
+    "Asthma Management",
+    "COPD Management",
+    "Sleep Apnea",
+    "Lung Cancer Screening",
+    "Pneumonia",
+    "Tuberculosis",
+    "Shortness of Breath",
+    "Chronic Cough",
+  ]
+
   // Filter appointments based on search query
   const filteredUpcoming = upcomingAppointments.filter(
     (appointment) =>
-      appointment.patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      `${appointment.patient?.firstName} ${appointment.patient?.lastName}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
       (appointment.reason && appointment.reason.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
   const filteredPast = pastAppointments.filter(
     (appointment) =>
-      appointment.patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      `${appointment.patient?.firstName} ${appointment.patient?.lastName}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
       (appointment.reason && appointment.reason.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
@@ -93,7 +119,12 @@ export default function DoctorAppointmentsPage() {
   useEffect(() => {
     async function fetchAppointments() {
       try {
-        const doctorId = "currentDoctorId" // Replace with actual doctor ID logic
+        const doctorId = localStorage.getItem("pulmocare_doctor_id") // Fetch doctor ID from localStorage
+        if (!doctorId) {
+          console.error("Doctor ID is not available in localStorage.")
+          return
+        }
+
         const appointments: Appointment[] = await adminApi.getAppointmentsByDoctorId(doctorId)
 
         const now = new Date()
@@ -110,11 +141,41 @@ export default function DoctorAppointmentsPage() {
     fetchAppointments()
   }, [])
 
+  // Fetch patients from the database
+  useEffect(() => {
+    async function fetchPatients() {
+      try {
+        const response = await adminApi.getAllPatients() // Replace with actual API call
+        setPatients(response)
+      } catch (error) {
+        console.error("Error fetching patients:", error)
+      }
+    }
+
+    fetchPatients()
+  }, [])
+
+  // Fetch available time slots for the selected date
+  useEffect(() => {
+    async function fetchAvailableTimes() {
+      if (!newAppointment.date) return
+
+      try {
+        const response = await adminApi.getAvailableTimes(newAppointment.date) // Replace with actual API call
+        setAvailableTimes(response)
+      } catch (error) {
+        console.error("Error fetching available times:", error)
+      }
+    }
+
+    fetchAvailableTimes()
+  }, [newAppointment.date])
+
   // Validate the appointment form
   const validateAppointmentForm = () => {
     const errors = {
-      patient: !newAppointment.patientId,
-      date: !newAppointment.date,
+      patient: !newAppointment.patient.firstName || !newAppointment.patient.lastName,
+      date: !newAppointment.date, // Validate manual date input
       time: !newAppointment.time,
       reason: !newAppointment.reason,
     }
@@ -148,13 +209,11 @@ export default function DoctorAppointmentsPage() {
 
     const newAppointmentObj: Appointment = {
       id: `${Date.now()}`, // Generate a unique ID
-      date: format(newAppointment.date, "yyyy-MM-dd"),
+      date: newAppointment.date, // Use manual date input
       hour: newAppointment.time,
       time: newAppointment.time, // Added the `time` property
       reason: newAppointment.reason,
-      status: newAppointment.status,
-      patientId: newAppointment.patientId,
-      patient: { id: newAppointment.patientId, name: "" }, // Placeholder for patient name
+      patient: { ...newAppointment.patient },
       doctor: { id: "currentDoctorId", name: "" }, // Placeholder for doctor details
     }
 
@@ -164,11 +223,10 @@ export default function DoctorAppointmentsPage() {
 
     // Reset form
     setNewAppointment({
-      patientId: "",
-      date: new Date(),
+      patient: { id: "", firstName: "", lastName: "", name: "" },
+      date: "", // Reset manual date input
       time: "",
       reason: "",
-      status: "Pending",
     })
 
     setCreateDialogOpen(false)
@@ -373,17 +431,27 @@ export default function DoctorAppointmentsPage() {
                 Patient <span className="text-red-500 ml-1">*</span>
               </Label>
               <Select
-                value={newAppointment.patientId}
+                value={newAppointment.patient.id}
                 onValueChange={(value) => {
-                  setNewAppointment({ ...newAppointment, patientId: value })
-                  setFormErrors({ ...formErrors, patient: false })
+                  const selectedPatient = patients.find((p) => p.id === value)
+                  if (selectedPatient) {
+                    setNewAppointment({
+                      ...newAppointment,
+                      patient: { id: selectedPatient.id, name: selectedPatient.name, firstName: selectedPatient.firstName, lastName: selectedPatient.lastName },
+                    })
+                    setFormErrors({ ...formErrors, patient: false })
+                  }
                 }}
               >
                 <SelectTrigger className={formErrors.patient ? "border-red-500" : ""}>
                   <SelectValue placeholder="Select patient" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="placeholder">Placeholder Patient</SelectItem>
+                  {patients.map((patient) => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {formErrors.patient && <p className="text-red-500 text-sm">Patient is required</p>}
@@ -430,8 +498,11 @@ export default function DoctorAppointmentsPage() {
                   <SelectValue placeholder="Select time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="09:00 AM">09:00 AM</SelectItem>
-                  <SelectItem value="10:00 AM">10:00 AM</SelectItem>
+                  {availableTimes.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {formErrors.time && <p className="text-red-500 text-sm">Time is required</p>}
@@ -452,27 +523,14 @@ export default function DoctorAppointmentsPage() {
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Consultation">Consultation</SelectItem>
-                  <SelectItem value="Follow-up">Follow-up</SelectItem>
+                  {reasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {formErrors.reason && <p className="text-red-500 text-sm">Reason is required</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={newAppointment.status}
-                onValueChange={(value) => setNewAppointment({ ...newAppointment, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Confirmed">Confirmed</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -527,21 +585,14 @@ export default function DoctorAppointmentsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="grid gap-1">
-                      <div className="font-semibold">{appointment.patient.name}</div>
-                      <div className="text-sm text-muted-foreground">{appointment.reason}</div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span>{appointment.date}</span>
-                        <span>•</span>
-                        <span>{appointment.time}</span>
-                        <span>•</span>
-                        <span className={appointment.status === "Confirmed" ? "text-green-500" : "text-amber-500"}>
-                          {appointment.status}
-                        </span>
-                      </div>
+                      <div className="font-semibold">Patient: {appointment.patient?.firstName} {appointment.patient?.lastName}</div>
+                      <div className="text-sm">Date: {appointment.date}</div>
+                      <div className="text-sm">Time: {appointment.hour}</div>
+                      <div className="text-sm">Reason: {appointment.reason}</div>
                     </div>
 
                     <div className="flex gap-2">
-                      <Link href={`/doctor/patients/${appointment.patientId}`}>
+                      <Link href={`/doctor/patients/${appointment.patient?.id}`}>
                         <Button variant="outline" size="sm">
                           View Patient
                         </Button>
@@ -569,19 +620,14 @@ export default function DoctorAppointmentsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="grid gap-1">
-                      <div className="font-semibold">{appointment.patient.name}</div>
-                      <div className="text-sm text-muted-foreground">{appointment.reason}</div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span>{appointment.date}</span>
-                        <span>•</span>
-                        <span>{appointment.time}</span>
-                        <span>•</span>
-                        <span className="text-green-500">{appointment.status}</span>
-                      </div>
+                      <div className="font-semibold">Patient: {appointment.patient?.firstName} {appointment.patient?.lastName}</div>
+                      <div className="text-sm">Date: {appointment.date}</div>
+                      <div className="text-sm">Time: {appointment.time}</div>
+                      <div className="text-sm">Reason: {appointment.reason}</div>
                     </div>
 
                     <div className="flex gap-2">
-                      <Link href={`/doctor/patients/${appointment.patientId}`}>
+                      <Link href={`/doctor/patients/${appointment.patient.id}`}>
                         <Button variant="outline" size="sm">
                           View Patient
                         </Button>

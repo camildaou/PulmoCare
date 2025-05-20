@@ -77,19 +77,16 @@ export default function DoctorsPage() {
                 <div className="text-sm text-muted-foreground">
                   {doctor.description || "Specialty not provided"}
                 </div>
-                <div className="flex justify-between text-sm">
+               
+               {/* <div className="flex justify-between text-sm">
                   <span>{doctor.patients || 0} patients</span>
                   <span>{doctor.appointments || 0} appointments today</span>
-                </div>
+                </div> */}
+                
                 <div className="flex justify-between pt-2">
                   <Link href={`/admin/doctors/${doctor.id}`}>
                     <Button variant="outline" size="sm">
                       See More
-                    </Button>
-                  </Link>
-                  <Link href={`/admin/doctors/schedule/${doctor.id}`}>
-                    <Button variant="outline" size="sm">
-                      View Schedule
                     </Button>
                   </Link>
                 </div>

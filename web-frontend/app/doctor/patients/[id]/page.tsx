@@ -335,7 +335,7 @@ export default function PatientDetailsPage() {
           <p className="text-muted-foreground">View and manage patient information.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/patients">
+          <Link href="/doctor/patients">
             <Button variant="outline">Back to Patients</Button>
           </Link>
         </div>

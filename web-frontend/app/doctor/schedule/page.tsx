@@ -66,10 +66,17 @@ const ScheduleManagement = dynamic(
           return { startTime, endTime };
         });
 
-        setSchedule((prev) => ({
-          ...prev,
-          [day]: formattedSlots, // Update time slots for the selected day
-        }));
+        setSchedule((prev) => {
+          const existingSlots = prev[day]?.map((slot) => slot.startTime) || [];
+          const uniqueSlots = formattedSlots.filter(
+            (slot) => !existingSlots.includes(slot.startTime)
+          );
+
+          return {
+            ...prev,
+            [day]: [...(prev[day] || []), ...uniqueSlots], // Add only unique slots
+          };
+        });
       };
 
       const handleDaySelection = (day: string) => {
@@ -112,7 +119,13 @@ const ScheduleManagement = dynamic(
           const formattedSchedule = Object.keys(availability.availableTimeSlots)
             .map((day) => ({
               date: Object.keys(dayNameMap).find((key) => dayNameMap[key] === day) || day,
-              availableSlots: availability.availableTimeSlots[day].map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`),
+              availableSlots: availability.availableTimeSlots[day]
+                .map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`)
+                .sort((a: string, b: string) => {
+                  const [aStart] = a.split(" - ");
+                  const [bStart] = b.split(" - ");
+                  return aStart.localeCompare(bStart);
+                }),
               appointments: [],
             }))
             .sort((a, b) => workingDays.indexOf(a.date) - workingDays.indexOf(b.date)); // Ensure sorting by workingDays order
@@ -181,7 +194,13 @@ const ScheduleManagement = dynamic(
             console.log("Doctor availability response:", availability); // Log the availability data structure
             const formattedSchedule = Object.keys(availability.availableTimeSlots).map((day) => ({
               date: Object.keys(dayNameMap).find((key) => dayNameMap[key] === day) || day, // Convert short day names to full names
-              availableSlots: availability.availableTimeSlots[day].map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`),
+              availableSlots: availability.availableTimeSlots[day]
+                .map((slot: { startTime: string; endTime: string }) => `${slot.startTime} - ${slot.endTime}`)
+                .sort((a: string, b: string) => {
+                  const [aStart] = a.split(" - ");
+                  const [bStart] = b.split(" - ");
+                  return aStart.localeCompare(bStart);
+                }),
               appointments: [], // Assuming appointments are not part of the response
             }))
             .sort((a, b) => workingDays.indexOf(a.date) - workingDays.indexOf(b.date)); // Ensure sorting by workingDays order
@@ -230,7 +249,7 @@ const ScheduleManagement = dynamic(
                 ))}
                 <button
                   onClick={saveSchedule}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary-dark"
                 >
                   Save Schedule
                 </button>

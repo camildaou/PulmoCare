@@ -57,47 +57,7 @@ export default function AdminDashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {adminName}</h1>
         <p className="text-muted-foreground">Manage your clinic operations from here.</p>
       </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{patientCount !== null ? patientCount : "Loading..."}</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Doctors</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{doctorCount !== null ? doctorCount : "Loading..."}</div>
-            <p className="text-xs text-muted-foreground">+1 new this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Today's Appointments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">3 pending confirmation</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">5 urgent</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-4">
+       <div className="grid gap-6 md:grid-cols-4">
         {/* Appointments */}
         <Link href="/admin/appointments">
           <Card className="h-full transition-transform duration-300 hover:scale-105 cursor-pointer">
@@ -158,6 +118,45 @@ export default function AdminDashboard() {
           </Card>
         </Link>
       </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{patientCount !== null ? patientCount : "Loading..."}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Active Doctors</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{doctorCount !== null ? doctorCount : "Loading..."}</div>
+          </CardContent>
+        </Card>
+        {/* <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Today's Appointments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">24</div>
+            <p className="text-xs text-muted-foreground">3 pending confirmation</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Pending Reports</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">12</div>
+            <p className="text-xs text-muted-foreground">5 urgent</p>
+          </CardContent>
+        </Card> */}
+      </div>
+
+     
     </div>
   )
 }

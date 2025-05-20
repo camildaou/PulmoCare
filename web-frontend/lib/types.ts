@@ -57,14 +57,10 @@ export interface Appointment {
   time: string; // Alias for hour
   reason?: string; // Reason for the appointment
   status?: string; // Status of the appointment (e.g., Confirmed, Pending)
-  patientId: string; // ID of the patient
-  patient: {
-    id: string;
-    name: string;
-  };
   doctor: {
     id: string;
     name: string;
   };
+  patient: Patient; // Updated to use the Patient interface
 }
 

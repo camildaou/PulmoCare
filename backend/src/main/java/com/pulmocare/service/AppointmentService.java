@@ -13,7 +13,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class AppointmentService {
@@ -40,7 +41,13 @@ public class AppointmentService {
         // Validate that the appointment time is available for the doctor
         validateAppointmentTime(appointment);
         
-        return appointmentRepository.save(appointment);
+        // Save the appointment
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        
+        // Remove the booked time slot from the doctor's availability
+        removeBookedTimeSlot(appointment);
+        
+        return savedAppointment;
     }
     
     /**
@@ -69,7 +76,14 @@ public class AppointmentService {
      * Get appointments by doctor ID
      */
     public List<Appointment> getAppointmentsByDoctorId(String doctorId) {
-        return appointmentRepository.findByDoctorId(doctorId);
+        System.out.println("Service: Fetching appointments for doctor ID: " + doctorId);
+        List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+        if (appointments == null || appointments.isEmpty()) {
+            System.out.println("Service: No appointments found for doctor ID: " + doctorId);
+        } else {
+            System.out.println("Service: Found " + appointments.size() + " appointments for doctor ID: " + doctorId);
+        }
+        return appointments;
     }
     
     /**
@@ -362,5 +376,53 @@ public class AppointmentService {
                 throw new RuntimeException("The doctor already has an appointment at this time");
             }
         }
+    }
+    
+    /**
+     * Check if a time slot is available for a doctor on a specific date
+     */
+    public boolean isTimeSlotAvailable(String doctorId, LocalDate date, String time) {
+        Doctor doctor = doctorRepository.findById(doctorId)
+            .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
+
+        String dayOfWeek = date.getDayOfWeek().toString().toLowerCase().substring(0, 3);
+        List<Doctor.TimeSlot> availableSlots = doctor.getAvailableTimeSlots().get(dayOfWeek);
+
+        if (availableSlots == null || availableSlots.isEmpty()) {
+            return false;
+        }
+
+        return availableSlots.stream().anyMatch(slot ->
+            slot.getStartTime().equals(time)
+        );
+    }
+    
+    /**
+     * Remove the booked time slot from the doctor's availability
+     */
+    private void removeBookedTimeSlot(Appointment appointment) {
+        Doctor doctor = appointment.getDoctor();
+        LocalDate date = appointment.getDate();
+        String dayOfWeek = date.getDayOfWeek().toString().toLowerCase().substring(0, 3);
+
+        List<Doctor.TimeSlot> availableSlots = doctor.getAvailableTimeSlots().get(dayOfWeek);
+        if (availableSlots != null) {
+            availableSlots.removeIf(slot -> slot.getStartTime().equals(appointment.getHour().toString()));
+
+            // Update the doctor's availability in the repository
+            doctorRepository.save(doctor);
+        }
+    }
+    
+    /**
+     * Get all appointments with only doctorId and patientId
+     */
+    public List<Map<String, String>> getAllAppointmentsWithIds() {
+        return appointmentRepository.findAll().stream()
+            .map(appointment -> Map.of(
+                "doctorId", appointment.getDoctor().getId(),
+                "patientId", appointment.getPatient().getId()
+            ))
+            .collect(Collectors.toList());
     }
 }

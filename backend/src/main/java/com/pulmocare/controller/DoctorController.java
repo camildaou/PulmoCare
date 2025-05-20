@@ -182,6 +182,13 @@ public class DoctorController {
                     availableTimeSlots.put(day, new java.util.ArrayList<>());
                 }
                 
+                // Check if the time slot already exists
+                List<Doctor.TimeSlot> existingSlots = availableTimeSlots.getOrDefault(day, new java.util.ArrayList<>());
+                boolean isDuplicate = existingSlots.stream().anyMatch(slot -> slot.getStartTime().equals(startTime) && slot.getEndTime().equals(endTime));
+                if (isDuplicate) {
+                    return ResponseEntity.badRequest().body("Time slot already exists for the given day and time.");
+                }
+                
                 // Add the new time slot
                 availableTimeSlots.get(day).add(newTimeSlot);
                 
@@ -486,12 +493,15 @@ public class DoctorController {
                 availableTimeSlots = new java.util.HashMap<>();
             }
 
+            // Modify the appendAvailability method to avoid adding duplicate time slots
             for (Map.Entry<String, List<Map<String, String>>> entry : newAvailability.entrySet()) {
                 String day = entry.getKey();
                 List<Map<String, String>> slots = entry.getValue();
 
                 // Initialize the list for the day if it doesn't exist
                 availableTimeSlots.putIfAbsent(day, new java.util.ArrayList<>());
+
+                List<Doctor.TimeSlot> existingSlots = availableTimeSlots.get(day);
 
                 for (Map<String, String> slot : slots) {
                     String startTime = slot.get("startTime");
@@ -501,9 +511,13 @@ public class DoctorController {
                         // Create and validate the new time slot
                         Doctor.TimeSlot newTimeSlot = new Doctor.TimeSlot(startTime, endTime);
 
-                        // Add the new time slot if it doesn't already exist
-                        if (!availableTimeSlots.get(day).contains(newTimeSlot)) {
-                            availableTimeSlots.get(day).add(newTimeSlot);
+                        // Check if the time slot already exists
+                        boolean isDuplicate = existingSlots.stream()
+                            .anyMatch(existingSlot -> existingSlot.getStartTime().equals(newTimeSlot.getStartTime()) &&
+                                                     existingSlot.getEndTime().equals(newTimeSlot.getEndTime()));
+
+                        if (!isDuplicate) {
+                            existingSlots.add(newTimeSlot);
                         }
                     } catch (IllegalArgumentException e) {
                         return ResponseEntity.badRequest().body("Invalid time slot: " + e.getMessage());
