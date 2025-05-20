@@ -5,21 +5,14 @@ import { TimeSlotPicker } from "@/components/ui/time-slot-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { scheduleApi } from "@/lib/api";
 import dynamic from "next/dynamic";
+import { Select } from "@/components/ui/select"; // Import a Select component for day selection
+
+const workingDays = ["mon", "tue", "wed", "thu", "fri"]; // Updated working days to lowercase format
 
 const ScheduleManagement = dynamic(
   () =>
     Promise.resolve(() => {
-      const [selectedDate, setSelectedDate] = useState<string | undefined>(
-        undefined
-      );
-      const [timeSlots, setTimeSlots] = useState<string[]>([]);
-      const [schedule, setSchedule] = useState<{
-        availableDates: Date | undefined;
-        timeSlots: Record<string, string[]>;
-      }>({
-        availableDates: undefined,
-        timeSlots: {},
-      });
+      const [schedule, setSchedule] = useState<Record<string, { startTime: string; endTime: string }[]>>({}); // Updated state type to handle time slots with startTime and endTime
       const [weeklySchedule, setWeeklySchedule] = useState<{
         date: string;
         appointments: { time: string; patientName: string }[];
@@ -30,47 +23,89 @@ const ScheduleManagement = dynamic(
         availableDates: Date | undefined;
         timeSlots: Record<string, string[]>;
       }) => {
-        setSchedule(newSchedule);
+        const formattedSchedule = Object.fromEntries(
+          Object.entries(newSchedule.timeSlots).map(([day, slots]) => [
+            day,
+            slots.map((startTime) => {
+              const [hours, minutes] = startTime.split(":").map(Number);
+              const endTime = new Date(0, 0, 0, hours, minutes + 30)
+                .toTimeString()
+                .split(" ")[0]
+                .slice(0, 5);
+              return { startTime, endTime };
+            }),
+          ])
+        );
+
+        setSchedule(formattedSchedule);
       };
 
-      const handleTimeSlotChange = (slots: string[]) => {
-        if (selectedDate) {
-          setTimeSlots(slots);
-          setSchedule({
-            ...schedule,
-            timeSlots: { ...schedule.timeSlots, [selectedDate]: slots },
-          });
-        } else {
-          alert("No date selected. Please select a date.");
-        }
+      const handleTimeSlotChange = (day: string, slots: string[]) => {
+        const formattedSlots = slots.map((startTime) => {
+          const [hours, minutes] = startTime.split(":").map(Number);
+          const endTime = new Date(0, 0, 0, hours, minutes + 30)
+            .toTimeString()
+            .split(" ")[0]
+            .slice(0, 5);
+          return { startTime, endTime };
+        });
+
+        setSchedule((prev) => ({
+          ...prev,
+          [day]: formattedSlots, // Update time slots for the selected day
+        }));
       };
 
-      const handleDateChange = (date: Date) => {
-        const dateString = date.toISOString().split("T")[0];
-        setSelectedDate(dateString);
-        setTimeSlots(schedule.timeSlots[dateString] || []); // Ensure time slots are updated for the selected date
-        if (!schedule.timeSlots[dateString]) {
-          setSchedule({
-            ...schedule,
-            timeSlots: { ...schedule.timeSlots, [dateString]: [] },
-          });
-        }
+      const handleDaySelection = (day: string) => {
+        setSchedule((prev) => {
+          if (prev[day]) {
+            const updatedSchedule = { ...prev };
+            delete updatedSchedule[day]; // Remove day if already selected
+            return updatedSchedule;
+          } else {
+            return { ...prev, [day]: [] }; // Add day with empty time slots if not selected
+          }
+        });
       };
+
+      useEffect(() => {
+        try {
+          // Store doctor ID in localStorage
+          const userInfo = localStorage.getItem("pulmocare_user");
+          if (userInfo) {
+            const user = JSON.parse(userInfo);
+            if (user.id) {
+              localStorage.setItem("pulmocare_doctor_id", user.id);
+            }
+          }
+        } catch (error) {
+          console.error("Error storing doctor ID in localStorage:", error);
+        }
+      }, []);
 
       const saveSchedule = async () => {
-        if (!selectedDate) {
-          console.error("No date selected to save schedule.");
+        const doctorId = localStorage.getItem("pulmocare_doctor_id"); // Retrieve doctor ID from localStorage
+        if (!doctorId) {
+          console.error("Doctor ID is not available in localStorage.");
+          return;
+        }
+
+        const selectedDays = Object.keys(schedule);
+        if (selectedDays.length === 0) {
+          console.error("No days selected to save schedule.");
           return;
         }
 
         const availabilityDetails = {
-          availableDays: Object.keys(schedule.timeSlots),
-          availableTimeSlots: Object.values(schedule.timeSlots).flat(), // Flatten the time slots into a single list
+          availableDays: selectedDays,
+          availableTimeSlots: schedule, // Send selected days and their time slots to the backend
         };
+
+        console.log("Payload being sent to the backend:", availabilityDetails); // Log the payload for debugging
 
         try {
           const response = await scheduleApi.saveAvailability(
-            "doctorId",
+            doctorId,
             availabilityDetails
           );
           console.log("Schedule saved successfully:", response);
@@ -104,38 +139,24 @@ const ScheduleManagement = dynamic(
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="mb-4">
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2 border rounded"
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
-                      setSelectedDate(selectedDate);
-                      setTimeSlots(schedule.timeSlots[selectedDate] || []); // Update time slots for the selected date
-                      if (!schedule.timeSlots[selectedDate]) {
-                        setSchedule({
-                          ...schedule,
-                          timeSlots: { ...schedule.timeSlots, [selectedDate]: [] },
-                        });
-                      }
-                    }}
-                  />
-                </div>
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold">Available Time Slots</h2>
-                  <TimeSlotPicker
-                    selectedSlots={timeSlots} // Pass only time slots
-                    onChange={(slots) => {
-                      setTimeSlots(slots);
-                      if (selectedDate) {
-                        setSchedule({
-                          ...schedule,
-                          timeSlots: { ...schedule.timeSlots, [selectedDate]: slots },
-                        });
-                      }
-                    }}
-                  />
-                </div>
+                {workingDays.map((day) => (
+                  <div key={day} className="mb-4">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={!!schedule[day]}
+                        onChange={() => handleDaySelection(day)}
+                      />
+                      <span>{day}</span>
+                    </label>
+                    {schedule[day] && (
+                      <TimeSlotPicker
+                        selectedSlots={schedule[day]?.map((slot) => slot.startTime) || []} // Map to startTime for compatibility
+                        onChange={(slots) => handleTimeSlotChange(day, slots)}
+                      />
+                    )}
+                  </div>
+                ))}
                 <button
                   onClick={saveSchedule}
                   className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
