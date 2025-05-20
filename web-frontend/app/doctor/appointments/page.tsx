@@ -12,116 +12,13 @@ import { format, isBefore } from "date-fns"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-
-// Mock data for patients
-const patients = [
-  { id: "1", name: "Alice Johnson", age: 42, condition: "Asthma" },
-  { id: "2", name: "Bob Smith", age: 35, condition: "COPD" },
-  { id: "3", name: "Carol Williams", age: 28, condition: "Bronchitis" },
-  { id: "4", name: "David Brown", age: 50, condition: "Emphysema" },
-  { id: "5", name: "Eve Davis", age: 33, condition: "Asthma" },
-]
-
-// Appointment reasons
-const appointmentReasons = [
-  "Initial Consultation",
-  "Follow-up",
-  "Test Results",
-  "Respiratory Assessment",
-  "Treatment Review",
-  "Emergency",
-]
-
-// Time slots
-const timeSlots = [
-  "09:00 AM",
-  "09:30 AM",
-  "10:00 AM",
-  "10:30 AM",
-  "11:00 AM",
-  "11:30 AM",
-  "12:00 PM",
-  "12:30 PM",
-  "01:00 PM",
-  "01:30 PM",
-  "02:00 PM",
-  "02:30 PM",
-  "03:00 PM",
-  "03:30 PM",
-  "04:00 PM",
-  "04:30 PM",
-]
+import { adminApi } from "@/lib/api"
+import { Appointment } from "@/lib/types"
 
 export default function DoctorAppointmentsPage() {
   // State for appointments
-  const [upcomingAppointments, setUpcomingAppointments] = useState([
-    {
-      id: 1,
-      date: "Today",
-      time: "09:00 AM",
-      patient: "Alice Johnson",
-      patientId: "1",
-      reason: "Follow-up",
-      status: "Confirmed",
-    },
-    {
-      id: 2,
-      date: "Today",
-      time: "10:30 AM",
-      patient: "Bob Smith",
-      patientId: "2",
-      reason: "Initial Consultation",
-      status: "Confirmed",
-    },
-    {
-      id: 3,
-      date: "Tomorrow",
-      time: "01:00 PM",
-      patient: "Carol Williams",
-      patientId: "3",
-      reason: "Test Results",
-      status: "Confirmed",
-    },
-    {
-      id: 4,
-      date: "Mar 30, 2025",
-      time: "02:30 PM",
-      patient: "David Brown",
-      patientId: "4",
-      reason: "Follow-up",
-      status: "Pending",
-    },
-  ])
-
-  const [pastAppointments, setPastAppointments] = useState([
-    {
-      id: 6,
-      date: "Mar 25, 2025",
-      time: "11:00 AM",
-      patient: "Frank Miller",
-      patientId: "6",
-      reason: "Follow-up",
-      status: "Completed",
-    },
-    {
-      id: 7,
-      date: "Mar 24, 2025",
-      time: "09:30 AM",
-      patient: "Grace Lee",
-      patientId: "7",
-      reason: "Asthma Review",
-      status: "Completed",
-    },
-    {
-      id: 8,
-      date: "Mar 22, 2025",
-      time: "02:00 PM",
-      patient: "Alice Johnson",
-      patientId: "1",
-      reason: "Follow-up",
-      status: "Completed",
-    },
-  ])
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [pastAppointments, setPastAppointments] = useState<Appointment[]>([])
 
   // State for pending reports
   const [pendingReports, setPendingReports] = useState(3)
@@ -172,14 +69,14 @@ export default function DoctorAppointmentsPage() {
   // Filter appointments based on search query
   const filteredUpcoming = upcomingAppointments.filter(
     (appointment) =>
-      appointment.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.reason.toLowerCase().includes(searchQuery.toLowerCase()),
+      appointment.patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (appointment.reason && appointment.reason.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
   const filteredPast = pastAppointments.filter(
     (appointment) =>
-      appointment.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.reason.toLowerCase().includes(searchQuery.toLowerCase()),
+      appointment.patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (appointment.reason && appointment.reason.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
   // Load pending reports count from localStorage
@@ -190,6 +87,27 @@ export default function DoctorAppointmentsPage() {
     } else {
       localStorage.setItem("pulmocare_pending_reports", "3")
     }
+  }, [])
+
+  // Fetch appointments for the current doctor
+  useEffect(() => {
+    async function fetchAppointments() {
+      try {
+        const doctorId = "currentDoctorId" // Replace with actual doctor ID logic
+        const appointments: Appointment[] = await adminApi.getAppointmentsByDoctorId(doctorId)
+
+        const now = new Date()
+        const past = appointments.filter((appointment) => new Date(appointment.date) < now)
+        const upcoming = appointments.filter((appointment) => new Date(appointment.date) >= now)
+
+        setPastAppointments(past)
+        setUpcomingAppointments(upcoming)
+      } catch (error) {
+        console.error("Error fetching appointments:", error)
+      }
+    }
+
+    fetchAppointments()
   }, [])
 
   // Validate the appointment form
@@ -228,17 +146,16 @@ export default function DoctorAppointmentsPage() {
       return
     }
 
-    // Create new appointment
-    const patient = patients.find((p) => p.id === newAppointment.patientId)
-
-    const newAppointmentObj = {
-      id: upcomingAppointments.length + pastAppointments.length + 1,
-      date: format(newAppointment.date, "MMM dd, yyyy"),
-      time: newAppointment.time,
-      patient: patient.name,
-      patientId: patient.id,
+    const newAppointmentObj: Appointment = {
+      id: `${Date.now()}`, // Generate a unique ID
+      date: format(newAppointment.date, "yyyy-MM-dd"),
+      hour: newAppointment.time,
+      time: newAppointment.time, // Added the `time` property
       reason: newAppointment.reason,
       status: newAppointment.status,
+      patientId: newAppointment.patientId,
+      patient: { id: newAppointment.patientId, name: "" }, // Placeholder for patient name
+      doctor: { id: "currentDoctorId", name: "" }, // Placeholder for doctor details
     }
 
     // Add to appointments list
@@ -466,11 +383,7 @@ export default function DoctorAppointmentsPage() {
                   <SelectValue placeholder="Select patient" />
                 </SelectTrigger>
                 <SelectContent>
-                  {patients.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      {patient.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="placeholder">Placeholder Patient</SelectItem>
                 </SelectContent>
               </Select>
               {formErrors.patient && <p className="text-red-500 text-sm">Patient is required</p>}
@@ -517,11 +430,8 @@ export default function DoctorAppointmentsPage() {
                   <SelectValue placeholder="Select time" />
                 </SelectTrigger>
                 <SelectContent>
-                  {timeSlots.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="09:00 AM">09:00 AM</SelectItem>
+                  <SelectItem value="10:00 AM">10:00 AM</SelectItem>
                 </SelectContent>
               </Select>
               {formErrors.time && <p className="text-red-500 text-sm">Time is required</p>}
@@ -542,11 +452,8 @@ export default function DoctorAppointmentsPage() {
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
-                  {appointmentReasons.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="Consultation">Consultation</SelectItem>
+                  <SelectItem value="Follow-up">Follow-up</SelectItem>
                 </SelectContent>
               </Select>
               {formErrors.reason && <p className="text-red-500 text-sm">Reason is required</p>}
@@ -620,7 +527,7 @@ export default function DoctorAppointmentsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="grid gap-1">
-                      <div className="font-semibold">{appointment.patient}</div>
+                      <div className="font-semibold">{appointment.patient.name}</div>
                       <div className="text-sm text-muted-foreground">{appointment.reason}</div>
                       <div className="flex items-center gap-2 text-sm">
                         <span>{appointment.date}</span>
@@ -662,7 +569,7 @@ export default function DoctorAppointmentsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="grid gap-1">
-                      <div className="font-semibold">{appointment.patient}</div>
+                      <div className="font-semibold">{appointment.patient.name}</div>
                       <div className="text-sm text-muted-foreground">{appointment.reason}</div>
                       <div className="flex items-center gap-2 text-sm">
                         <span>{appointment.date}</span>
@@ -674,14 +581,17 @@ export default function DoctorAppointmentsPage() {
                     </div>
 
                     <div className="flex gap-2">
-<Link href={`/doctor/patients/${appointment.patientId}`}>
-  <Button variant="outline" size="sm">View Patient</Button>
-</Link>
+                      <Link href={`/doctor/patients/${appointment.patientId}`}>
+                        <Button variant="outline" size="sm">
+                          View Patient
+                        </Button>
+                      </Link>
 
-<Link href={`/doctor/appointments/${appointment.id}`}>
-  <Button variant="outline" size="sm">View Details</Button>
-</Link>
-
+                      <Link href={`/doctor/appointments/${appointment.id}`}>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>

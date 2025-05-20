@@ -17,6 +17,11 @@ export function Sidebar() {
       title: "Dashboard",
     },
     {
+      href: "/doctor/schedule",
+      icon: CalendarIcon,
+      title: "My Schedule",
+    },
+    {
       href: "/doctor/appointments",
       icon: CalendarIcon,
       title: "Appointments",
@@ -36,6 +41,7 @@ export function Sidebar() {
       icon: User,
       title: "Profile",
     },
+
   ]
 
   const handleLogout = () => {

@@ -50,3 +50,21 @@ export interface Patient {
   password?: string;
 }
 
+export interface Appointment {
+  id: string;
+  date: string; // ISO date string
+  hour: string; // Time in HH:mm format
+  time: string; // Alias for hour
+  reason?: string; // Reason for the appointment
+  status?: string; // Status of the appointment (e.g., Confirmed, Pending)
+  patientId: string; // ID of the patient
+  patient: {
+    id: string;
+    name: string;
+  };
+  doctor: {
+    id: string;
+    name: string;
+  };
+}
+

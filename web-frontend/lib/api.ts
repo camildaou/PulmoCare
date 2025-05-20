@@ -45,6 +45,10 @@ export const adminApi = {
     const response = await api.post('/patient', patientDetails);
     return response.data;
   },
+  getAppointmentsByDoctorId: async (doctorId: string) => {
+    const response = await api.get(`/appointments/doctor/${doctorId}`);
+    return response.data;
+  },
 };
 
 export const doctorApi = {
@@ -74,6 +78,21 @@ export const doctorApi = {
   },
   getAllPatients: async () => {
     const response = await api.get('/patient');
+    return response.data;
+  },
+};
+
+export const scheduleApi = {
+  saveAvailability: async (doctorId: string, availabilityDetails: any) => {
+    const response = await api.put(`/doctors/${doctorId}/availability`, availabilityDetails);
+    return response.data;
+  },
+  fetchWeeklySchedule: async (doctorId: string) => {
+    const response = await api.get(`/doctors/${doctorId}/availability/slots`);
+    return response.data;
+  },
+  addTimeSlot: async (doctorId: string, timeSlotDetails: any) => {
+    const response = await api.post(`/doctors/${doctorId}/availability/timeslot`, timeSlotDetails);
     return response.data;
   },
 };
