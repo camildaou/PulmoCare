@@ -18,13 +18,19 @@ public class AppointmentController {
     
     @Autowired
     private AppointmentService appointmentService;
-    
-    /**
+      /**
      * Create a new appointment
      */
     @PostMapping
     public ResponseEntity<Appointment> createAppointment(@RequestBody Appointment appointment) {
     try {
+        // Log the incoming appointment data for debugging
+        System.out.println("Creating appointment with: " + 
+                          "Date=" + appointment.getDate() + 
+                          ", StartTime=" + appointment.getHour() + 
+                          ", EndTime=" + appointment.getEndTimeStr() +
+                          ", DoctorId=" + (appointment.getDoctor() != null ? appointment.getDoctor().getId() : "null"));
+        
         Appointment newAppointment = appointmentService.createAppointment(appointment);
         return new ResponseEntity<>(newAppointment, HttpStatus.CREATED);
     } catch (Exception e) {

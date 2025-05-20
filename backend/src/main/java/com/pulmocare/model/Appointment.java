@@ -10,10 +10,10 @@ import java.time.LocalTime;
 public class Appointment {
     @Id
     private String id;
-    
-    // Schedule information
+      // Schedule information
     private LocalDate date;
-    private LocalTime hour;
+    private LocalTime hour;    
+    private String endTimeStr; // For handling the end time string from the frontend
     
     // References to patient and doctor
     @DBRef
@@ -36,8 +36,7 @@ public class Appointment {
     private String reason;
     private boolean upcoming; // true if upcoming, false if past
     private boolean isVaccine; // true if this is a vaccine appointment
-    
-    // Constructors
+      // Constructors
     public Appointment() {
     }
 
@@ -45,6 +44,20 @@ public class Appointment {
                     String reason, String location, boolean isVaccine) {
         this.date = date;
         this.hour = hour;
+        this.patient = patient;
+        this.doctor = doctor;
+        this.reason = reason;
+        this.location = location;
+        this.isVaccine = isVaccine;
+        this.upcoming = true; // New appointments are always upcoming
+        this.reportPending = false; // No report pending by default
+    }
+    
+    public Appointment(LocalDate date, LocalTime hour, String endTimeStr, Patient patient, Doctor doctor, 
+                    String reason, String location, boolean isVaccine) {
+        this.date = date;
+        this.hour = hour;
+        this.endTimeStr = endTimeStr;
         this.patient = patient;
         this.doctor = doctor;
         this.reason = reason;
@@ -73,10 +86,16 @@ public class Appointment {
 
     public LocalTime getHour() {
         return hour;
+    }    public void setHour(LocalTime hour) {
+        this.hour = hour;
     }
 
-    public void setHour(LocalTime hour) {
-        this.hour = hour;
+    public String getEndTimeStr() {
+        return endTimeStr;
+    }
+
+    public void setEndTimeStr(String endTimeStr) {
+        this.endTimeStr = endTimeStr;
     }
 
     public Patient getPatient() {

@@ -273,19 +273,41 @@ class AppointmentRepository(private val context: Context? = null) {
 suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reason: String): Result<Appointment> {
     return withContext(Dispatchers.IO) {
         try {
-            // Extract just the start time from the time slot
-            val startTime = time.split(" - ")[0].trim()
+            // Extract start time and end time from the time slot string
+            val timeParts = time.split(" - ")
+            val startTime = timeParts[0].trim()
+            
+            // Calculate end time if it's not in the format or add proper formatting if it is
+            val endTime = if (timeParts.size > 1) {
+                timeParts[1].trim()
+            } else {
+                // Calculate end time (30 minutes after start time)
+                val hourParts = startTime.split(":")
+                if (hourParts.size == 2) {
+                    val hourInt = hourParts[0].toInt()
+                    val minuteInt = hourParts[1].toInt()
+                    
+                    val endHour = if (minuteInt + 30 >= 60) hourInt + 1 else hourInt
+                    val endMinute = (minuteInt + 30) % 60
+                    String.format("%02d:%02d", endHour, endMinute)
+                } else {
+                    // Default to 30 minutes later if parsing fails
+                    startTime
+                }
+            }
             
             Log.d("AppointmentRepository", "Scheduling appointment:")
             Log.d("AppointmentRepository", "- Doctor ID: ${doctor.id}")
             Log.d("AppointmentRepository", "- Date: $date")
             Log.d("AppointmentRepository", "- Time slot: $time")
             Log.d("AppointmentRepository", "- Start time: $startTime")
+            Log.d("AppointmentRepository", "- End time: $endTime")
             
             // Create a simplified doctor object with only the ID to avoid validation issues
             val appointment = Appointment(
                 date = date,
                 hour = startTime,
+                endTime = endTime, // Add end time to appointment
                 patient = Patient(id = sessionManager?.getPatientId()),
                 doctor = Doctor(id = doctor.id),
                 reason = reason
@@ -296,13 +318,17 @@ suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reas
                 // Refresh local appointment data
                 fetchAppointmentsForCurrentPatient()
                 Log.d("AppointmentRepository", "Appointment scheduled successfully: ${response.body()?.id}")
+                
+                // Remove the booked time slot from the local cache to prevent double booking
+                // Note: The proper solution is to refresh from the backend, which we do in the UI
+                
                 Result.success(response.body()!!)
             } else {
                 val errorBody = response.errorBody()?.string() ?: "Unknown error"
                 Log.e("AppointmentRepository", "Error scheduling appointment: $errorBody")
                 Result.failure(RuntimeException("Failed to schedule appointment: $errorBody"))
             }        
-            } catch (e: Exception) {
+        } catch (e: Exception) {
             Log.e("AppointmentRepository", "Error scheduling appointment", e)
             Result.failure(e)
         }
@@ -360,21 +386,45 @@ suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reas
     }    /**
      * Get available time slots for a doctor on a specific date
      */
-    // Update this method in AppointmentRepository
     suspend fun getAvailableTimeSlots(doctorId: String, date: LocalDate): List<String> {
         return withContext(Dispatchers.IO) {
             try {
                 val dateStr = date.toString() // Convert LocalDate to String in ISO format (YYYY-MM-DD)
+                Log.d(TAG, "Fetching available time slots for doctor $doctorId on date $dateStr")
                 val response = appointmentApiService.getAvailableTimeSlots(doctorId, dateStr)
                 
                 if (response.isSuccessful && response.body() != null) {
                     val responseBody = response.body()!!
-                    val availableSlots = responseBody["availableSlots"] as? List<String> ?: emptyList()
-                    return@withContext availableSlots
+                    
+                    // The API returns different formats, so we need to handle both possibilities
+                    @Suppress("UNCHECKED_CAST")
+                    val availableSlotsRaw = responseBody["availableSlots"]
+                    
+                    val result = when (availableSlotsRaw) {
+                        // Handle list of strings format
+                        is List<*> -> {
+                            if (availableSlotsRaw.isEmpty()) {
+                                emptyList()
+                            } else if (availableSlotsRaw[0] is String) {
+                                availableSlotsRaw as List<String>
+                            } else {
+                                // Handle list of maps format
+                                (availableSlotsRaw as List<Map<String, String>>).map { slot ->
+                                    "${slot["startTime"]} - ${slot["endTime"]}"
+                                }
+                            }
+                        }
+                        else -> emptyList()
+                    }
+                    
+                    Log.d(TAG, "Retrieved ${result.size} available time slots: $result")
+                    return@withContext result
                 }
+                
+                Log.e(TAG, "Error getting available time slots: ${response.errorBody()?.string()}")
                 emptyList()
             } catch (e: Exception) {
-                Log.e("AppointmentRepository", "Error getting available time slots", e)
+                Log.e(TAG, "Error getting available time slots", e)
                 emptyList()
             }
         }

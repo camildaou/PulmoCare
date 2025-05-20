@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,7 @@ import com.example.pulmocare.data.repository.DoctorRepository
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +61,26 @@ fun AppointmentScreen() {
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf("") }
     var appointmentReason by remember { mutableStateOf("") }
+    
+    // For time slot pagination
+    var currentTimeSlotsPage by remember { mutableStateOf(0) }
+    val timeSlotsPerPage = 9 // Show 9 time slots per page (3x3 grid)
+    
+    // Common appointment reasons
+    val commonReasons = listOf(
+        "Routine Check-up",
+        "Follow-up Appointment",
+        "Respiratory Issues",
+        "Asthma Management",
+        "COPD Management",
+        "Sleep Apnea",
+        "Lung Cancer Screening",
+        "Pneumonia",
+        "Tuberculosis",
+        "Shortness of Breath",
+        "Chronic Cough",
+        "Other (please specify)"
+    )
     
     val coroutineScope = rememberCoroutineScope()
       // Fetch doctors and appointments when the screen loads
@@ -220,28 +243,34 @@ fun AppointmentScreen() {
                 }
             }
         }
-    }    // Schedule appointment dialog
+    }
+
+    // Schedule appointment dialog
     if (showScheduleDialog) {
         ScheduleAppointmentDialog(
             onDismiss = { showScheduleDialog = false },
             doctors = doctorRepository.getModelDoctors(),
             isLoading = isLoading.value,
             error = error.value,
-            selectedDoctor = selectedDoctor,            onDoctorSelected = { doctor -> 
+            selectedDoctor = selectedDoctor,            
+            onDoctorSelected = { doctor -> 
                 selectedDoctor = doctor
                 // Fetch time slots for the selected doctor
                 coroutineScope.launch {
                     availableTimeSlots = doctorRepository.getTimeSlotsByDoctorAndDay(doctor.id ?: "", selectedDate)
+                    currentTimeSlotsPage = 0 // Reset to first page when doctor changes
                     Log.d("AppointmentScreen", "Fetched ${availableTimeSlots.size} time slots for newly selected doctor")
                 }
                 schedulingStep = 1
             },
             schedulingStep = schedulingStep,
             selectedDate = selectedDate,
-//            onDateSelected = { selectedDate = it },
             selectedTime = selectedTime,
             onTimeSelected = { selectedTime = it },                
             availableTimes = availableTimeSlots,
+            currentPage = currentTimeSlotsPage,
+            onPageChanged = { currentTimeSlotsPage = it },
+            timeSlotsPerPage = timeSlotsPerPage,
             onDateSelected = { newDate ->
                 selectedDate = newDate
                 // Fetch time slots directly from the backend when date changes
@@ -249,56 +278,61 @@ fun AppointmentScreen() {
                     selectedDoctor?.id?.let { doctorId ->
                         val slots = doctorRepository.getTimeSlotsByDoctorAndDay(doctorId, selectedDate)
                         availableTimeSlots = slots
+                        currentTimeSlotsPage = 0 // Reset to first page when date changes
                         Log.d("AppointmentScreen", "Fetched ${slots.size} time slots for doctor $doctorId on $selectedDate")
                     }
                 }
             },
             appointmentReason = appointmentReason,
             onReasonChanged = { appointmentReason = it },
+            commonReasons = commonReasons,
             onScheduleAppointment = {
-    coroutineScope.launch {
-        selectedDoctor?.let { doctor ->
-            val formattedDate = selectedDate.format(DateTimeFormatter.ISO_DATE)
-            val startTime = selectedTime.split(" - ")[0].trim()
-            
-            Log.d("AppointmentScreen", "Scheduling appointment:")
-            Log.d("AppointmentScreen", "- Doctor: ${doctor.id} (${doctor.firstName} ${doctor.lastName})")
-            Log.d("AppointmentScreen", "- Date: $formattedDate")
-            Log.d("AppointmentScreen", "- Time: $startTime (from slot: $selectedTime)")
-            Log.d("AppointmentScreen", "- Day of week: ${selectedDate.dayOfWeek.toString().toLowerCase().substring(0, 3)}")
-            Log.d("AppointmentScreen", "- Reason: $appointmentReason")
-            Log.d("AppointmentScreen", "- Doctor available days: ${doctor.availableDays}")
-            Log.d("AppointmentScreen", "- Doctor time slots: ${doctor.availableTimeSlots}")
-              val result = appointmentRepository.scheduleAppointment(
-                doctor = doctor,
-                date = formattedDate,
-                time = selectedTime, // Send the full time slot string
-                reason = appointmentReason
-            )
-            
-            result.onSuccess { appointment ->
-                // Show success message
-                Toast.makeText(context, "Appointment scheduled successfully!", Toast.LENGTH_SHORT).show()
-                
-                // Update local state to avoid double-booking
-                // Refresh the doctor list to get updated availability
                 coroutineScope.launch {
-                    doctorRepository.fetchAllDoctors()
-                    appointmentRepository.fetchAppointmentsForCurrentPatient()
-                    Log.d("AppointmentScreen", "Refreshed doctor and appointment data after scheduling")
+                    selectedDoctor?.let { doctor ->
+                        val formattedDate = selectedDate.format(DateTimeFormatter.ISO_DATE)
+                        val startTime = selectedTime.split(" - ")[0].trim()
+                        Log.d("AppointmentScreen", "Scheduling appointment:")
+                        Log.d("AppointmentScreen", "- Doctor: ${doctor.id} (${doctor.firstName} ${doctor.lastName})")
+                        Log.d("AppointmentScreen", "- Date: $formattedDate")
+                        Log.d("AppointmentScreen", "- Full time slot: $selectedTime")
+                        Log.d("AppointmentScreen", "- Day of week: ${selectedDate.dayOfWeek.toString().toLowerCase().substring(0, 3)}")
+                        Log.d("AppointmentScreen", "- Reason: $appointmentReason")
+                        Log.d("AppointmentScreen", "- Doctor available days: ${doctor.availableDays}")
+                        Log.d("AppointmentScreen", "- Doctor time slots: ${doctor.availableTimeSlots}")
+                        
+                        // Add a small delay for logs to be displayed
+//                        delay(100)
+                        
+                        val result = appointmentRepository.scheduleAppointment(
+                            doctor = doctor,
+                            date = formattedDate,
+                            time = selectedTime, // Send the full time slot string
+                            reason = appointmentReason
+                        )
+                        
+                        result.onSuccess { appointment ->
+                            // Show success message
+                            Toast.makeText(context, "Appointment scheduled successfully!", Toast.LENGTH_SHORT).show()
+                            
+                            // Update local state to avoid double-booking
+                            // Refresh the doctor list to get updated availability
+                            coroutineScope.launch {
+                                doctorRepository.fetchAllDoctors()
+                                appointmentRepository.fetchAppointmentsForCurrentPatient()
+                                Log.d("AppointmentScreen", "Refreshed doctor and appointment data after scheduling")
+                            }
+                            
+                            // Reset and close dialog
+                            showScheduleDialog = false
+                            schedulingStep = 0
+                        }.onFailure { error ->
+                            // Show error message
+                            Toast.makeText(context, "Failed to schedule: ${error.message}", Toast.LENGTH_LONG).show()
+                            Log.e("AppointmentScreen", "Failed to schedule appointment", error)
+                        }
+                    }
                 }
-                
-                // Reset and close dialog
-                showScheduleDialog = false
-                schedulingStep = 0
-            }.onFailure { error ->
-                // Show error message
-                Toast.makeText(context, "Failed to schedule: ${error.message}", Toast.LENGTH_LONG).show()
-                Log.e("AppointmentScreen", "Failed to schedule appointment", error)
-            }
-        }
-    }
-},
+            },
             onBackPressed = {
                 when (schedulingStep) {
                     0 -> showScheduleDialog = false
@@ -424,12 +458,19 @@ fun ScheduleAppointmentDialog(
     selectedTime: String,
     onTimeSelected: (String) -> Unit,
     availableTimes: List<String>,
+    currentPage: Int = 0,
+    onPageChanged: (Int) -> Unit = {},
+    timeSlotsPerPage: Int = 9,
     appointmentReason: String,
     onReasonChanged: (String) -> Unit,
+    commonReasons: List<String> = emptyList(),
     onScheduleAppointment: () -> Unit,
     onBackPressed: () -> Unit,
     onConfirmTimeAndDate: () -> Unit
 ) {
+    // For dropdown menu control
+    var isReasonDropdownExpanded by remember { mutableStateOf(false) }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -544,98 +585,194 @@ fun ScheduleAppointmentDialog(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Time selection
-                        Text(
-                            text = "Available Time Slots:",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                   
-                    // Time slot selection with refresh option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Available Time Slots:",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                          // Add refresh button to allow manual refresh of doctor availability
-                        IconButton(onClick = {
-                            selectedDoctor?.id?.let { doctorId ->
-                                Log.d("AppointmentScreen", "Manually refreshing doctor time slots")
-                                // Directly call the refreshed endpoint
-                                onDateSelected(selectedDate) // This will trigger the time slot fetch
-                            }
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh time slots",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    
-                    if (availableTimes.isEmpty()) {
-                        Text(
-                            text = "No available times for selected date",
-                            color = MaterialTheme.colorScheme.error
-                        )                    } else {
-                        // Add a note about the time slot duration
-                        Text(
-                            text = "All appointments are 30-minute slots",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        
-                        // Display available time slots in a grid for better visibility
-                        FlowRow(
+                        // Time selection header with refresh button
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            maxItemsInEachRow = 3
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Each time slot is a 30-minute block (validated in backend)
-                            availableTimes.forEach { time -> 
-                                val isSelected = time == selectedTime
-                                
-                                Surface(
-                                    shape = MaterialTheme.shapes.small,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                                            else MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(
-                                        width = 1.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.outline
-                                    ),
-                                    onClick = { onTimeSelected(time) }
+                            Text(
+                                text = "Available Time Slots:",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                              
+                            // Add refresh button to allow manual refresh of doctor availability
+                            IconButton(onClick = {
+                                selectedDoctor?.id?.let { doctorId ->
+                                    Log.d("AppointmentScreen", "Manually refreshing doctor time slots")
+                                    // Directly call the refreshed endpoint
+                                    onDateSelected(selectedDate) // This will trigger the time slot fetch
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh time slots",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        
+                        if (availableTimes.isEmpty()) {
+                            Text(
+                                text = "No available times for selected date",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            // Add a note about the time slot duration
+                            Text(
+                                text = "All appointments are 30-minute slots",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            // Pagination implementation
+                            val totalPages = (availableTimes.size + timeSlotsPerPage - 1) / timeSlotsPerPage
+                            val startIndex = currentPage * timeSlotsPerPage
+                            val endIndex = minOf(startIndex + timeSlotsPerPage, availableTimes.size)
+                            val currentPageSlots = availableTimes.subList(startIndex, endIndex)
+                            
+                // Display available time slots in a grid with pagination
+                            Column {
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    maxItemsInEachRow = 3
                                 ) {
-                                    Text(
-                                        text = time,
-                                        modifier = Modifier.padding(
-                                            horizontal = 12.dp,
-                                            vertical = 8.dp
-                                        ),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    // Each time slot is a 30-minute block (validated in backend)
+                                    currentPageSlots.forEach { time -> 
+                                        val isSelected = time == selectedTime
+                                        
+                                        Surface(
+                                            shape = MaterialTheme.shapes.small,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+                                                    else MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(
+                                                width = 1.dp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary 
+                                                    else MaterialTheme.colorScheme.outline
+                                            ),
+                                            onClick = { 
+                                                onTimeSelected(time) 
+                                                Log.d("AppointmentScreen", "Selected time slot: $time")
+                                            }
+                                        ) {
+                                            Text(
+                                                text = time,
+                                                modifier = Modifier.padding(
+                                                    horizontal = 12.dp,
+                                                    vertical = 8.dp
+                                                ),
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                // Only show pagination if more than one page
+                                if (totalPages > 1) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(
+                                            onClick = { 
+                                                if (currentPage > 0) onPageChanged(currentPage - 1) 
+                                            },
+                                            enabled = currentPage > 0
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowBack,
+                                                contentDescription = "Previous page",
+                                                tint = if (currentPage > 0) 
+                                                    MaterialTheme.colorScheme.primary
+                                                else 
+                                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                            )
+                                        }
+                                        
+                                        Text(
+                                            text = "Page ${currentPage + 1}/$totalPages",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        )
+                                        
+                                        IconButton(
+                                            onClick = { 
+                                                if (currentPage < totalPages - 1) onPageChanged(currentPage + 1) 
+                                            },
+                                            enabled = currentPage < totalPages - 1
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowForward,
+                                                contentDescription = "Next page",
+                                                tint = if (currentPage < totalPages - 1) 
+                                                    MaterialTheme.colorScheme.primary
+                                                else 
+                                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Reason for appointment
-                        OutlinedTextField(
-                            value = appointmentReason,
-                            onValueChange = onReasonChanged,
-                            label = { Text("Reason for visit") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // Reason for appointment dropdown
+                        Column {
+                            Text(
+                                text = "Reason for Visit:",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Dropdown field
+                            ExposedDropdownMenuBox(
+                                expanded = isReasonDropdownExpanded,
+                                onExpandedChange = { isReasonDropdownExpanded = it },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = appointmentReason,
+                                    onValueChange = onReasonChanged,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(),
+                                    readOnly = commonReasons.isNotEmpty(),
+                                    label = { Text("Select or enter reason") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isReasonDropdownExpanded)
+                                    },
+                                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                                )
+                                
+                                // Only show dropdown if we have common reasons
+                                if (commonReasons.isNotEmpty()) {
+                                    ExposedDropdownMenu(
+                                        expanded = isReasonDropdownExpanded,
+                                        onDismissRequest = { isReasonDropdownExpanded = false }
+                                    ) {
+                                        commonReasons.forEach { reason ->
+                                            DropdownMenuItem(
+                                                text = { Text(reason) },
+                                                onClick = {
+                                                    onReasonChanged(reason)
+                                                    isReasonDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -647,11 +784,12 @@ fun ScheduleAppointmentDialog(
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
-                          AppointmentDetailItem(
-                        icon = Icons.Default.Schedule,
-                        label = "Time",
-                        value = selectedTime
-                    )
+                        
+                        AppointmentDetailItem(
+                            icon = Icons.Default.Schedule,
+                            label = "Time",
+                            value = selectedTime
+                        )
                         
                         AppointmentDetailItem(
                             icon = Icons.Default.MedicalServices,
@@ -664,7 +802,6 @@ fun ScheduleAppointmentDialog(
                             label = "Date",
                             value = selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))
                         )
-                        
                         
                         AppointmentDetailItem(
                             icon = Icons.Default.LocationOn,
@@ -714,7 +851,8 @@ fun ScheduleAppointmentDialog(
                 }
             }
         },
-        confirmButton = {            if (schedulingStep < 2) {
+        confirmButton = {
+            if (schedulingStep < 2) {
                 TextButton(
                     onClick = {
                         when (schedulingStep) {
@@ -723,7 +861,7 @@ fun ScheduleAppointmentDialog(
                                     // Proceed to date/time selection
                                     // schedulingStep = 1 - Handled by onDoctorSelected
                                 }
-                            }                            
+                            }
                             1 -> {
                                 if (selectedTime.isNotEmpty()) {
                                     // Proceed to confirmation
@@ -931,7 +1069,7 @@ fun FlowRow(
         
         val height = rows.sumOf { row -> 
             row.maxOfOrNull { it.height } ?: 0
-        }
+        } + (rows.size - 1) * 8 // Add vertical spacing
         
         layout(constraints.maxWidth, height) {
             var y = 0

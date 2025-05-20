@@ -359,8 +359,7 @@ fun getModelDoctors(): List<ModelDoctor> {
     suspend fun fetchAllDoctors() {
         return fetchDoctors()
     }
-    
-    /**
+      /**
      * Get available time slots for a doctor on a specific date
      * This method fetches 30-minute time slots directly from the backend
      */
@@ -369,30 +368,30 @@ fun getModelDoctors(): List<ModelDoctor> {
         val result = mutableListOf<String>()
         
         try {
+            val dateStr = date.toString() // Format as YYYY-MM-DD
             val dayOfWeek = date.dayOfWeek.toString().toLowerCase().substring(0, 3)
             Log.d(TAG, "Fetching time slots for doctor $doctorId on $date ($dayOfWeek)")
             
-            val response = doctorApiService.getDoctorAvailability(doctorId)
+            // Use the dedicated endpoint for available slots
+            val appointmentApiService = NetworkModule.appointmentApiService()
+            val response = appointmentApiService.getAvailableTimeSlots(doctorId, dateStr)
+            
             if (response.isSuccessful && response.body() != null) {
-                val availabilityData = response.body()!!
+                val responseBody = response.body()!!
                 
                 @Suppress("UNCHECKED_CAST")
-                val availableTimeSlots = availabilityData["availableTimeSlots"] as? Map<String, List<Map<String, String>>>
+                val availableSlots = responseBody["availableSlots"] as? List<Map<String, String>> ?: emptyList()
                 
-                if (availableTimeSlots != null) {
-                    val dayTimeSlots = availableTimeSlots[dayOfWeek] ?: emptyList()
-                    
-                    // Convert the backend format to our display format
-                    for (slot in dayTimeSlots) {
-                        val startTime = slot["startTime"]
-                        val endTime = slot["endTime"]
-                        if (startTime != null && endTime != null) {
-                            result.add("$startTime - $endTime")
-                        }
+                // Convert the backend format to our display format
+                for (slot in availableSlots) {
+                    val startTime = slot["startTime"]
+                    val endTime = slot["endTime"]
+                    if (startTime != null && endTime != null) {
+                        result.add("$startTime - $endTime")
                     }
-                    
-                    Log.d(TAG, "Retrieved ${result.size} time slots for $dayOfWeek: $result")
                 }
+                
+                Log.d(TAG, "Retrieved ${result.size} available time slots for $doctorId on $date: $result")
             } else {
                 Log.e(TAG, "Error fetching time slots: ${response.errorBody()?.string()}")
             }
@@ -403,5 +402,41 @@ fun getModelDoctors(): List<ModelDoctor> {
         }
         
         return result
+    }
+    
+    /**
+     * Updates the time slots for a doctor after an appointment is booked
+     * This ensures that the time slot is removed from the available slots
+     */
+    suspend fun updateDoctorTimeSlotsAfterBooking(doctorId: String, date: LocalDate, bookedTimeSlot: String) {
+        try {
+            Log.d(TAG, "Updating doctor time slots after booking: $doctorId, $date, $bookedTimeSlot")
+            
+            // Get the updated time slots from the backend
+            val updatedSlots = getTimeSlotsByDoctorAndDay(doctorId, date)
+            Log.d(TAG, "After booking, found ${updatedSlots.size} available time slots: $updatedSlots")
+            
+            // Update the doctor in our local cache if needed
+            val doctorIndex = _doctors.indexOfFirst { it.id == doctorId }
+            if (doctorIndex >= 0) {
+                val doctor = _doctors[doctorIndex]
+                val dayOfWeek = date.dayOfWeek.toString().toLowerCase().substring(0, 3)
+                
+                // Create updated available times map
+                val updatedAvailableTimes = doctor.availableTimes.toMutableMap()
+                updatedAvailableTimes[dayOfWeek] = updatedSlots
+                
+                // Create updated doctor with new time slots
+                val updatedDoctor = doctor.copy(availableTimes = updatedAvailableTimes)
+                
+                // Update the doctor in the list
+                _doctors.removeAt(doctorIndex)
+                _doctors.add(doctorIndex, updatedDoctor)
+                
+                Log.d(TAG, "Updated local doctor cache with new time slots")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating doctor time slots after booking", e)
+        }
     }
 }

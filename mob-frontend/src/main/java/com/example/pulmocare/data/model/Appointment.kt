@@ -9,10 +9,10 @@ import java.time.LocalTime
  */
 data class Appointment(
     val id: String? = null,
-    
-    // Schedule information
+      // Schedule information
     val date: String, // In ISO format: YYYY-MM-DD
-    val hour: String, // In format: HH:MM
+    val hour: String, // In format: HH:MM (start time)
+    val endTime: String? = null, // In format: HH:MM (end time)
     
     // References to patient and doctor
     val patient: Patient? = null,

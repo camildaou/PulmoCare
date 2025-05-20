@@ -309,8 +309,7 @@ public class DoctorController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-    
-    /**
+      /**
      * Get available time slots for a specific date
      */
     @GetMapping("/{id}/availability/slots")
@@ -337,12 +336,59 @@ public class DoctorController {
                 return ResponseEntity.ok(Map.of("availableSlots", new java.util.ArrayList<>()));
             }
             
-            // Get all available slots for this day
-            List<Doctor.TimeSlot> allSlots = doctor.getAvailableTimeSlots().get(dayOfWeek);
-            if (allSlots == null || allSlots.isEmpty()) {
+            // Get working hours for this day
+            List<Doctor.TimeSlot> workDaySlots = doctor.getAvailableTimeSlots().get(dayOfWeek);
+            if (workDaySlots == null || workDaySlots.isEmpty()) {
                 return ResponseEntity.ok(Map.of("availableSlots", new java.util.ArrayList<>()));
             }
-              // Get existing appointments for this date
+            
+            // Determine working hours boundary
+            LocalTime startWorkingHour = null;
+            LocalTime endWorkingHour = null;
+            
+            for (Doctor.TimeSlot slot : workDaySlots) {
+                String[] startParts = slot.getStartTime().split(":");
+                LocalTime slotStartTime = LocalTime.of(
+                    Integer.parseInt(startParts[0]), 
+                    Integer.parseInt(startParts[1])
+                );
+                
+                String[] endParts = slot.getEndTime().split(":");
+                LocalTime slotEndTime = LocalTime.of(
+                    Integer.parseInt(endParts[0]), 
+                    Integer.parseInt(endParts[1])
+                );
+                
+                if (startWorkingHour == null || slotStartTime.isBefore(startWorkingHour)) {
+                    startWorkingHour = slotStartTime;
+                }
+                
+                if (endWorkingHour == null || slotEndTime.isAfter(endWorkingHour)) {
+                    endWorkingHour = slotEndTime;
+                }
+            }
+            
+            // Generate all possible 30-minute slots for this day within working hours
+            List<Doctor.TimeSlot> allSlots = new java.util.ArrayList<>();
+            LocalTime currentTime = startWorkingHour;
+            
+            while (currentTime.plusMinutes(30).compareTo(endWorkingHour) <= 0) {
+                String currentTimeStr = String.format("%02d:%02d", currentTime.getHour(), currentTime.getMinute());
+                String nextTimeStr = String.format("%02d:%02d", 
+                                              currentTime.plusMinutes(30).getHour(), 
+                                              currentTime.plusMinutes(30).getMinute());
+                
+                try {
+                    Doctor.TimeSlot slot = new Doctor.TimeSlot(currentTimeStr, nextTimeStr);
+                    allSlots.add(slot);
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid slots
+                }
+                
+                currentTime = currentTime.plusMinutes(30);
+            }
+            
+            // Get existing appointments for this date
             List<Appointment> existingAppointments = appointmentService.getAppointmentsByDoctorAndDate(id, localDate);
             
             // Create a set of booked start times
