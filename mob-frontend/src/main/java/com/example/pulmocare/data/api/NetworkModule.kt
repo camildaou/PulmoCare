@@ -48,13 +48,13 @@ object NetworkModule {
                     response
                 } catch (e: Exception) {
                     Log.e(TAG, "Network error: ${e.message}")
-                    throw e
-                }
+                    throw e                }
             }
-            .connectTimeout(30, TimeUnit.SECONDS) // Increased timeout
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true) // Enable retries
+            .connectTimeout(60, TimeUnit.SECONDS) // Extended timeout for PDF processing
+            .readTimeout(90, TimeUnit.SECONDS)    // Extended timeout for receiving response
+            .writeTimeout(60, TimeUnit.SECONDS)   // Extended timeout for uploading PDF
+            .callTimeout(120, TimeUnit.SECONDS)   // Overall call timeout
+            .retryOnConnectionFailure(true)       // Enable retries
             .build()
     }
     
@@ -94,11 +94,30 @@ object NetworkModule {
     fun doctorApiService(): DoctorApiService {
         return createRetrofit().create(DoctorApiService::class.java)
     }
-    
-    /**
+      /**
      * Get ChatbotApiService instance
      */
     fun chatbotApiService(): ChatbotApiService {
         return createRetrofit().create(ChatbotApiService::class.java)
+    }
+    
+    /**
+     * Get GeminiApiService instance
+     */
+    fun geminiApiService(): GeminiApiService {
+        return createRetrofit().create(GeminiApiService::class.java)
+    }
+      /**
+     * Get XrayApiService instance
+     */
+    fun xrayApiService(): XrayApiService {
+        return createRetrofit().create(XrayApiService::class.java)
+    }
+    
+    /**
+     * Get ParserApiService instance
+     */
+    fun parserApiService(): ParserApiService {
+        return createRetrofit().create(ParserApiService::class.java)
     }
 }

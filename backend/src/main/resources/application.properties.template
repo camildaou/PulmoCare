@@ -1,0 +1,8 @@
+# MongoDB Connection Settings
+spring.data.mongodb.uri=${MONGODB_URI:mongodb+srv://username:password@host/}
+spring.data.mongodb.database=${MONGODB_DATABASE:PulmoCareDB}
+spring.data.mongodb.auto-index-creation=true
+
+# Server Configuration
+server.port=${SERVER_PORT:8081}
+gemini.api.key=${GEMINI_API_KEY:your_api_key_here}

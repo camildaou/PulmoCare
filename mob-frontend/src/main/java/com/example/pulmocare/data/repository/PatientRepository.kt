@@ -55,19 +55,25 @@ class PatientRepository {
     
     /**
      * Get patient by ID
-     */
-    fun getPatientById(id: String): Flow<Result<Patient>> = flow {
+     */    fun getPatientById(id: String): Flow<Result<Patient>> = flow {
         try {
+            Log.d(TAG, "Fetching patient with ID: $id")
             val response = patientApiService.getPatientById(id)
             if (response.isSuccessful) {
                 response.body()?.let {
+                    Log.d(TAG, "Successfully fetched patient data: ${it.firstName}, ${it.lastName}, email: ${it.email}")
                     emit(Result.success(it))
-                } ?: emit(Result.failure(Exception("Empty response body")))
+                } ?: run {
+                    Log.e(TAG, "Empty response body when fetching patient with ID: $id")
+                    emit(Result.failure(Exception("Empty response body")))
+                }
             } else {
-                emit(Result.failure(Exception("Failed to get patient: ${response.errorBody()?.string()}")))
+                val errorMsg = "Failed to get patient: ${response.errorBody()?.string()}"
+                Log.e(TAG, errorMsg + ", status code: ${response.code()}")
+                emit(Result.failure(Exception(errorMsg)))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting patient by ID", e)
+            Log.e(TAG, "Error getting patient by ID: $id", e)
             emit(Result.failure(e))
         }
     }

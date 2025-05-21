@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,6 +38,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,13 +47,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pulmocare.data.UserRepository
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pulmocare.data.User
 import com.example.pulmocare.ui.theme.LightMuted
 import com.example.pulmocare.ui.theme.LightMutedText
 import com.example.pulmocare.ui.theme.MedicalBlue
+import com.example.pulmocare.ui.viewmodel.PatientProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,40 +65,92 @@ fun DashboardScreen(
     onNavigateToAppointments: () -> Unit,
     onNavigateToMedicalInfo: () -> Unit,
     onNavigateToDoctors: () -> Unit,
+    onNavigateToMedicalReports: () -> Unit,
     onNavigateToAIAssessment: () -> Unit,
-    onNavigateToProfile: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    patientId: String
 ) {
-    val userRepository = remember { UserRepository() }
-    val user = remember { userRepository.getCurrentUser() }
+    val viewModel: PatientProfileViewModel = viewModel()
+    val patientState by viewModel.patientState.collectAsState()
     var showNotifications by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
 
-    Scaffold(
+    // Load patient data when screen is first displayed
+    LaunchedEffect(patientId) {
+        viewModel.getPatientProfile(patientId)
+    }
+
+    // Update loading state based on patientState
+    LaunchedEffect(patientState) {
+        isLoading = patientState is PatientProfileViewModel.PatientState.Loading || patientState is PatientProfileViewModel.PatientState.Initial
+    }
+
+        Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Welcome, ${user?.firstName ?: "Guest"}",
-                            style = MaterialTheme.typography.titleLarge
-                        )
+                title = {                    
+                    Column(
+                        modifier = Modifier.padding(start = 8.dp) // Add padding to push text to the right a bit
+                    ) {                          
+                        if (isLoading) {
+                            // Show loading animation while user is being fetched
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp,
+                                    strokeCap = StrokeCap.Round
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Loading user data...",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        } else {
+                            val name = when (patientState) {
+                                is PatientProfileViewModel.PatientState.Success -> (patientState as PatientProfileViewModel.PatientState.Success).patient.firstName
+                                else -> null
+                            }
+                            Text(
+                                text = "Welcome To PulmoCare, $name!",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp,
+                                    color = MedicalBlue
+                                )
+                            )
+                        }
                         Text(
                             text = "Manage your respiratory health",
                             style = MaterialTheme.typography.bodyMedium,
                             color = LightMutedText
                         )
-                    }
+                    }                
                 },
                 actions = {
-                    BadgedBox(
-                        badge = {
-                            Badge { Text("3") }
-                        }
+                    // Adjust notification bell icon to make it clearer
+                    Box(
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        IconButton(onClick = { showNotifications = !showNotifications }) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "Notifications"
-                            )
+                        BadgedBox(
+                            badge = {
+                                Badge { Text("3") }
+                            }
+                        ) {
+                            IconButton(
+                                onClick = { showNotifications = !showNotifications },
+                                modifier = Modifier
+                                    .size(48.dp)  // Increased size for better visibility
+                                    .padding(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = "Notifications",
+                                    modifier = Modifier.size(28.dp),  // Larger icon
+                                    tint = MedicalBlue  // Use the brand color
+                                )
+                            }
                         }
                     }
 
@@ -98,28 +158,7 @@ fun DashboardScreen(
                         expanded = showNotifications,
                         onDismissRequest = { showNotifications = false }
                     ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text(
-                                text = "Notifications",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-
-                            NotificationItem(
-                                title = "Appointment Rescheduled",
-                                description = "Your appointment with Dr. Johnson has been moved to April 18, 2025"
-                            )
-
-                            NotificationItem(
-                                title = "Upcoming Vaccine",
-                                description = "Your annual flu vaccine is due in 2 weeks"
-                            )
-
-                            NotificationItem(
-                                title = "New Test Results",
-                                description = "Your recent pulmonary function test results are available"
-                            )
-                        }
+                        // Dropdown menu content stays the same
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -158,13 +197,22 @@ fun DashboardScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
             FeatureCard(
                 title = "Consult Doctors",
                 description = "Find and connect with pulmonary specialists",
                 icon = Icons.Default.People,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onNavigateToDoctors
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            FeatureCard(
+                title = "Medical Reports",
+                description = "Upload and analyze blood tests and medical reports",
+                icon = Icons.Default.Description,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onNavigateToMedicalReports
             )
 
             Spacer(modifier = Modifier.height(24.dp))
