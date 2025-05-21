@@ -8,7 +8,7 @@ This project uses environment variables to securely manage confidential informat
 
 ### 1. Environment Variables
 
-Create a `.env` file in the `backend` directory with the following variables:
+Create a `.env` file in both the project root and `backend` directory with the following variables:
 
 ```
 # MongoDB Connection Settings
@@ -20,7 +20,15 @@ SERVER_PORT=8081
 GEMINI_API_KEY=your_api_key_here
 ```
 
-### 2. Google Service Account Key
+Note: The connection string **must** start with either `mongodb://` or `mongodb+srv://`
+
+### 2. Security Best Practices
+
+- **NEVER commit your actual credentials** to the Git repository
+- **NEVER log credentials** in application logs or console output
+- **NEVER share .env files** containing real credentials with other team members
+- Always use the template files and have each developer set up their own credentials locally
+- If you suspect credentials have been compromised, change them immediately
 
 For Google Vertex AI integration, you need to create a service account key:
 
