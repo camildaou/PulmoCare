@@ -76,14 +76,7 @@ public class AppointmentService {
      * Get appointments by doctor ID
      */
     public List<Appointment> getAppointmentsByDoctorId(String doctorId) {
-        System.out.println("Service: Fetching appointments for doctor ID: " + doctorId);
-        List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
-        if (appointments == null || appointments.isEmpty()) {
-            System.out.println("Service: No appointments found for doctor ID: " + doctorId);
-        } else {
-            System.out.println("Service: Found " + appointments.size() + " appointments for doctor ID: " + doctorId);
-        }
-        return appointments;
+        return appointmentRepository.findByDoctorId(doctorId);
     }
     
     /**
@@ -414,15 +407,4 @@ public class AppointmentService {
         }
     }
     
-    /**
-     * Get all appointments with only doctorId and patientId
-     */
-    public List<Map<String, String>> getAllAppointmentsWithIds() {
-        return appointmentRepository.findAll().stream()
-            .map(appointment -> Map.of(
-                "doctorId", appointment.getDoctor().getId(),
-                "patientId", appointment.getPatient().getId()
-            ))
-            .collect(Collectors.toList());
-    }
 }

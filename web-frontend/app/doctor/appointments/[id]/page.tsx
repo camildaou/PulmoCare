@@ -123,18 +123,7 @@ export default function AppointmentDetailsPage() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Previous Diagnosis</h3>
-                <p className="text-sm mt-1">Mild asthma exacerbation due to seasonal allergies (Feb 10, 2025)</p>
-              </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Previous Prescription</h3>
-                <ul className="text-sm mt-1 list-disc pl-5 space-y-1">
-                  <li>Albuterol inhaler, 2 puffs every 4-6 hours as needed</li>
-                  <li>Fluticasone nasal spray, 1 spray in each nostril daily</li>
-                </ul>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -182,7 +171,7 @@ export default function AppointmentDetailsPage() {
           <Tabs defaultValue="diagnosis">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="diagnosis">Diagnosis & Prescription</TabsTrigger>
-              <TabsTrigger value="assessment">Assessment & Plan</TabsTrigger>
+              <TabsTrigger value="assessment">Plan</TabsTrigger>
               <TabsTrigger value="confidential">Confidential Notes</TabsTrigger>
             </TabsList>
 
@@ -218,17 +207,6 @@ export default function AppointmentDetailsPage() {
                     placeholder="Enter prescription details"
                     value={prescription}
                     onChange={(e) => setPrescription(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Additional Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Enter additional notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
                     rows={3}
                   />
                 </div>

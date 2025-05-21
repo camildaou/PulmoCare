@@ -568,22 +568,31 @@ export default function PatientDetailsPage() {
         {/* Right Section */}
         <div className="space-y-6">
           <Tabs defaultValue="prescriptions">
-            <TabsList className="grid grid-cols-6 w-full">
-              <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
-              <TabsTrigger value="symptoms">Symptoms</TabsTrigger>
-              <TabsTrigger value="reports">Reports</TabsTrigger>
-              <TabsTrigger value="bloodtests">Blood Tests</TabsTrigger>
-              <TabsTrigger value="xrays">X-Rays</TabsTrigger>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="prescriptions">Past Appointments</TabsTrigger>
               <TabsTrigger value="vitals">Vitals</TabsTrigger>
             </TabsList>
 
             <TabsContent value="prescriptions" className="space-y-4 pt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Prescriptions & Diagnosis</CardTitle>
+                  <CardTitle>Past Appointments</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {/* ...prescriptions content... */}
+                  <ul className="space-y-4">
+                    <li>
+                      <h4 className="font-semibold">Diagnosis: Common Cold</h4>
+                      <p>Plan: Rest, hydration, and over-the-counter medication.</p>
+                      <p>Resources: <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" className="text-blue-500">YouTube Link</a></p>
+                      <p>Prescriptions: Paracetamol 500mg</p>
+                    </li>
+                    <li>
+                      <h4 className="font-semibold">Diagnosis: Hypertension</h4>
+                      <p>Plan: Regular exercise, low-sodium diet, and medication.</p>
+                      <p>Resources: <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" className="text-blue-500">YouTube Link</a></p>
+                      <p>Prescriptions: Amlodipine 5mg</p>
+                    </li>
+                  </ul>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -883,6 +892,62 @@ export default function PatientDetailsPage() {
                       <p className="text-muted-foreground italic">No vaccination history available.</p>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="appointments" className="space-y-4 pt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upcoming Appointments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-4">
+                    <li>
+                      <h4 className="font-semibold">Name: John Doe</h4>
+                      <p>Date: May 25, 2025</p>
+                      <p>Hour: 10:00 AM</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline">View Patient</Button>
+                        <Button>Start Appointment</Button>
+                      </div>
+                    </li>
+                    <li>
+                      <h4 className="font-semibold">Name: Jane Smith</h4>
+                      <p>Date: May 26, 2025</p>
+                      <p>Hour: 2:00 PM</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline">View Patient</Button>
+                        <Button>Start Appointment</Button>
+                      </div>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Past Appointments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-4">
+                    <li>
+                      <h4 className="font-semibold">Name: Alice Brown</h4>
+                      <p>Date: May 15, 2025</p>
+                      <p>Hour: 11:00 AM</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline">View Patient</Button>
+                      </div>
+                    </li>
+                    <li>
+                      <h4 className="font-semibold">Name: Bob White</h4>
+                      <p>Date: May 10, 2025</p>
+                      <p>Hour: 3:00 PM</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline">View Patient</Button>
+                      </div>
+                    </li>
+                  </ul>
                 </CardContent>
               </Card>
             </TabsContent>

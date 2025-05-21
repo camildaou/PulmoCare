@@ -86,7 +86,9 @@ public class Appointment {
 
     public LocalTime getHour() {
         return hour;
-    }    public void setHour(LocalTime hour) {
+    }
+
+    public void setHour(LocalTime hour) {
         this.hour = hour;
     }
 
@@ -186,29 +188,4 @@ public class Appointment {
         isVaccine = vaccine;
     }
 
-    public void setDoctorId(String doctorId) {
-        if (this.doctor == null) {
-            this.doctor = new Doctor();
-        }
-        this.doctor.setId(doctorId);
-    }
-
-    public void setPatientId(String patientId) {
-        if (this.patient == null) {
-            this.patient = new Patient();
-        }
-        this.patient.setId(patientId);
-    }
-
-    public void setHour(String time) {
-        this.hour = LocalTime.parse(time);
-    }
-
-    public String getDoctorId() {
-        return this.doctor != null ? this.doctor.getId() : null;
-    }
-
-    public String getPatientId() {
-        return this.patient != null ? this.patient.getId() : null;
-    }
 }

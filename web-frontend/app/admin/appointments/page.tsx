@@ -201,8 +201,22 @@ export default function AdminAppointmentsPage() {
     vaccines: "",
   })
 
+  // Appointment type
+  type Appointment = {
+    id: number
+    date: string | Date
+    time: string
+    patient: string
+    patientId: string
+    doctor: string
+    doctorId: string
+    reason: string
+    status: string
+    vaccines: string
+  }
+
   // State for edit appointment form
-  const [editingAppointment, setEditingAppointment] = useState(null)
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
 
   // State to track which dialog is open
   const [editDialogOpen, setEditDialogOpen] = useState(false)

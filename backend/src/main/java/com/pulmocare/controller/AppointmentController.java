@@ -92,7 +92,7 @@ public class AppointmentController {
             List<Appointment> appointments = appointmentService.getAppointmentsByDoctorId(doctorId);
             return new ResponseEntity<>(appointments, HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
+            return new ResponseEntity<>(null,HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
     
@@ -245,10 +245,10 @@ public class AppointmentController {
             System.out.println("Received Appointment Request: " + appointment);
 
             // Log the validation step
-            System.out.println("Validating time slot for Doctor ID: " + appointment.getDoctorId() + ", Date: " + appointment.getDate() + ", Time: " + appointment.getHour());
+            System.out.println("Validating time slot for Doctor ID: " + appointment.getDoctor().getId() + ", Date: " + appointment.getDate() + ", Time: " + appointment.getHour());
 
             boolean isAvailable = appointmentService.isTimeSlotAvailable(
-                appointment.getDoctorId(), 
+                appointment.getDoctor().getId(), 
                 appointment.getDate(), 
                 appointment.getHour().toString() // Convert LocalTime to String
             );
@@ -257,7 +257,7 @@ public class AppointmentController {
             System.out.println("Time slot availability: " + isAvailable);
 
             if (!isAvailable) {
-                System.out.println("Time slot not available for Doctor ID: " + appointment.getDoctorId());
+                System.out.println("Time slot not available for Doctor ID: " + appointment.getDoctor().getId());
                 return new ResponseEntity<>("The selected time slot is not available.", HttpStatus.BAD_REQUEST);
             }
 
@@ -286,19 +286,6 @@ public class AppointmentController {
 
             // Include detailed error message in the response
             return new ResponseEntity<>("An error occurred while creating the appointment: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get all appointments with only doctorId and patientId
-     */
-    @GetMapping("/ids")
-    public ResponseEntity<List<Map<String, String>>> getAllAppointmentsWithIds() {
-        try {
-            List<Map<String, String>> appointments = appointmentService.getAllAppointmentsWithIds();
-            return new ResponseEntity<>(appointments, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

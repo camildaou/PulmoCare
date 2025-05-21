@@ -14,153 +14,53 @@ export default function DataAnalysisPage() {
       <Tabs defaultValue="prediction">
         <TabsList>
           <TabsTrigger value="prediction">Prediction</TabsTrigger>
-          <TabsTrigger value="detection">Detection</TabsTrigger>
         </TabsList>
 
         <TabsContent value="prediction" className="space-y-6 pt-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Asthma Exacerbation Risk</CardTitle>
-                <CardDescription>
-                  Predict the risk of asthma exacerbation based on patient data and environmental factors.
-                </CardDescription>
+                <CardTitle>Asthma Predictions</CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="patient">Patient</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                      <option value="">Select a patient</option>
-                      <option value="1">Alice Johnson</option>
-                      <option value="2">Bob Smith</option>
-                      <option value="3">Carol Williams</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timeframe">Prediction Timeframe</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                      <option value="7">Next 7 days</option>
-                      <option value="14">Next 14 days</option>
-                      <option value="30">Next 30 days</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="factors">Include Environmental Factors</Label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="pollen"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="pollen" className="text-sm font-normal">
-                        Pollen Count
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="pollution"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="pollution" className="text-sm font-normal">
-                        Air Pollution
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="weather"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="weather" className="text-sm font-normal">
-                        Weather Changes
-                      </Label>
-                    </div>
-                  </div>
-                  <Button className="w-full">Generate Prediction</Button>
-                </form>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-01-31, Prediction: 719.69</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-02-28, Prediction: 823.98</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-03-31, Prediction: 761.05</span>
+                  </li>
+                </ul>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
-                <CardTitle>COPD Progression</CardTitle>
-                <CardDescription>
-                  Predict the progression of COPD based on patient history and current status.
-                </CardDescription>
+                <CardTitle>COPD Predictions</CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="patient">Patient</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                      <option value="">Select a patient</option>
-                      <option value="2">Bob Smith</option>
-                      <option value="4">David Brown</option>
-                      <option value="8">Henry Wilson</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timeframe">Prediction Timeframe</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                      <option value="3">3 months</option>
-                      <option value="6">6 months</option>
-                      <option value="12">12 months</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="factors">Include Factors</Label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="smoking"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="smoking" className="text-sm font-normal">
-                        Smoking Status
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="medication"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="medication" className="text-sm font-normal">
-                        Medication Adherence
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="exercise"
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <Label htmlFor="exercise" className="text-sm font-normal">
-                        Exercise Routine
-                      </Label>
-                    </div>
-                  </div>
-                  <Button className="w-full">Generate Prediction</Button>
-                </form>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-01-31, Prediction: 498.22</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-02-28, Prediction: 544.23</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Date: 2026-03-31, Prediction: 468.48</span>
+                  </li>
+                </ul>
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Prediction Results</CardTitle>
-              <CardDescription>
-                No predictions generated yet. Use the forms above to generate predictions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex h-[200px] items-center justify-center border rounded-md">
-                <p className="text-muted-foreground">Prediction results will appear here</p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="detection" className="space-y-6 pt-6">
@@ -198,7 +98,6 @@ export default function DataAnalysisPage() {
                       <option value="all">All Abnormalities</option>
                     </select>
                   </div>
-                  <Button className="w-full">Run Detection</Button>
                 </form>
               </CardContent>
             </Card>
@@ -236,25 +135,10 @@ export default function DataAnalysisPage() {
                       <option value="all">Comprehensive Analysis</option>
                     </select>
                   </div>
-                  <Button className="w-full">Run Analysis</Button>
                 </form>
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Detection Results</CardTitle>
-              <CardDescription>
-                No detections performed yet. Use the forms above to run detection algorithms.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex h-[200px] items-center justify-center border rounded-md">
-                <p className="text-muted-foreground">Detection results will appear here</p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
