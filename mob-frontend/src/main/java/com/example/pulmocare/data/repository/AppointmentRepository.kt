@@ -354,15 +354,15 @@ suspend fun scheduleAppointment(doctor: Doctor, date: String, time: String, reas
             Log.d("AppointmentRepository", "- Time slot: $time")
             Log.d("AppointmentRepository", "- Start time: $startTime")
             Log.d("AppointmentRepository", "- End time: $endTime")
-            
-            // Create a simplified doctor object with only the ID to avoid validation issues
+              // Create a simplified doctor object with only the ID to avoid validation issues
             val appointment = Appointment(
                 date = date,
                 hour = startTime,
                 endTime = endTime, // Add end time to appointment
                 patient = Patient(id = sessionManager?.getPatientId()),
                 doctor = Doctor(id = doctor.id),
-                reason = reason
+                reason = reason,
+                location = doctor.location // Include the doctor's location
             )
             
             val response = appointmentApiService.createAppointment(appointment)

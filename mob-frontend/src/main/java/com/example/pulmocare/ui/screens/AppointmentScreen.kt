@@ -1,8 +1,11 @@
 package com.example.pulmocare.ui.screens
 
+import android.os.Build
 import androidx.compose.ui.text.font.FontWeight
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,6 +40,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.min
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentScreen() {
@@ -193,8 +197,7 @@ fun AppointmentScreen() {
                         ) {
                             Text("No upcoming appointments. Schedule one now!")
                         }
-                    } else {
-                        LazyColumn(
+                    } else {                        LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(upcomingAppointments) { appointment -> 
@@ -210,7 +213,8 @@ fun AppointmentScreen() {
                                             appointmentToCancel = it
                                             showCancelDialog = true
                                         }
-                                    }
+                                    },
+                                    appointment = appointment
                                 )
                             }
                         }
@@ -353,121 +357,276 @@ fun AppointmentCard(
     time: String,
     location: String,
     isPast: Boolean = false,
-    onCancel: (() -> Unit)? = null
+    onCancel: (() -> Unit)? = null,
+    appointment: com.example.pulmocare.data.model.Appointment? = null
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
+    val context = LocalContext.current
+      Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPast) 
+                MaterialTheme.colorScheme.surface 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        ),
+        shape = MaterialTheme.shapes.medium,
+        border = if (!isPast) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) else null
+    ){
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
+            // Card header with doctor info and status
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = doctorName,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = specialty,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Doctor avatar placeholder (can be replaced with actual image)
+                    Surface(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = doctorName.take(1),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column {
+                        Text(
+                            text = doctorName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = specialty,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 
-                // Status chip
+                // Status chip with improved styling
                 Surface(
                     shape = MaterialTheme.shapes.small,
-                    color = if (isPast) MaterialTheme.colorScheme.surfaceVariant 
-                            else MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = if (isPast) "Completed" else "Upcoming",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant 
-                               else MaterialTheme.colorScheme.onPrimaryContainer
+                    color = if (isPast) 
+                        MaterialTheme.colorScheme.surfaceVariant 
+                    else 
+                        MaterialTheme.colorScheme.primaryContainer,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isPast) 
+                            MaterialTheme.colorScheme.outline 
+                        else 
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Enhanced appointment details with more visible location
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
                 ) {
-                    // Date and time
                     Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CalendarToday,
+                            imageVector = if (isPast) Icons.Default.Check else Icons.Default.AccessTime,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            modifier = Modifier.size(14.dp),
+                            tint = if (isPast) 
+                                MaterialTheme.colorScheme.onSurfaceVariant 
+                            else 
+                                MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "$date at $time",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                      // Location with more prominence
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = location,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (!isPast) FontWeight.Bold else FontWeight.SemiBold,
-                            color = if (!isPast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            text = if (isPast) "Completed" else "Upcoming",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isPast) 
+                                MaterialTheme.colorScheme.onSurfaceVariant 
+                            else 
+                                MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
             
-            if (!isPast && onCancel != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                TextButton(
-                    onClick = onCancel,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.align(Alignment.End)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Enhanced appointment details with visual separation
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.medium,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .animateContentSize() // Add smooth animation when content changes
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Cancel Appointment")
+                    // Date and time with improved visual
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Date & Time",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "$date at $time",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Location with prominent styling
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Location",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = location,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (!isPast) 
+                                    MaterialTheme.colorScheme.primary 
+                                else 
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Action buttons with improved styling
+            if (!isPast) {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Add to Google Calendar button
+                    if (appointment != null) {
+                        OutlinedButton(
+                            onClick = {
+                                val intent = com.example.pulmocare.data.GoogleCalendarHelper.createAddToCalendarIntent(context, appointment)
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Add to Google Calendar",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Add to Calendar",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Cancel button
+                    if (onCancel != null) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel appointment",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Cancel",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ScheduleAppointmentDialog(
@@ -1117,6 +1276,7 @@ fun FlowRow(
 }
 
 // Helper function to get day of week from LocalDate
+@RequiresApi(Build.VERSION_CODES.O)
 fun getDayOfWeek(date: LocalDate): String {
     return date.dayOfWeek.toString().take(3)
 }
