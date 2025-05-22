@@ -97,7 +97,7 @@ export default function AdminAppointmentsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [currentEditId, setCurrentEditId] = useState(null)  // State for available time slots
-  const [availableTimeSlots, setAvailableTimeSlots] = useState([])
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>(timeSlots)
   
   // State for form validation
   const [formErrors, setFormErrors] = useState({
@@ -382,14 +382,13 @@ const handleDeleteAppointment = async (id: string) => {
 
     return !hasConflict
   }
-
   // Function to get available time slots for a doctor on a specific date
   const getAvailableTimeSlots = (
     doctorId: string,
     date: Date,
     currentAppointmentId: string | null = null,
   ) => {
-    if (!doctorId || !date) return []
+    if (!doctorId || !date) return timeSlots
 
     // Filter time slots based on existing appointments
     return timeSlots.filter((time) => {
@@ -405,15 +404,25 @@ const handleDeleteAppointment = async (id: string) => {
       return !hasConflict
     })
   }
-
   // Update available time slots when doctor or date changes in create form
   useEffect(() => {
     if (newAppointment.doctor?.id && newAppointment.date) {
-      const availableSlots = getAvailableTimeSlots(
-        newAppointment.doctor.id,
-        parseISO(newAppointment.date) // Convert LocalDate to Date
-      )
-      setAvailableTimeSlots(availableSlots as never[])
+      try {
+        const date = parseISO(newAppointment.date);
+        const availableSlots = getAvailableTimeSlots(
+          newAppointment.doctor.id,
+          date
+        );
+        setAvailableTimeSlots(availableSlots);
+        console.log("Available time slots updated:", availableSlots);
+      } catch (error) {
+        console.error("Error updating available time slots:", error);
+        // Fallback to all time slots if there's an error
+        setAvailableTimeSlots(timeSlots);
+      }
+    } else {
+      // Default to all time slots when doctor or date is not selected
+      setAvailableTimeSlots(timeSlots);
     }
   }, [newAppointment.doctor?.id, newAppointment.date])
 
@@ -644,52 +653,58 @@ const handleDeleteAppointment = async (id: string) => {
                   min={new Date().toISOString().split('T')[0]} // Disable past dates
                 />
                 {formErrors.date && <p className="text-red-500 text-sm">Date is required</p>}
-              </div>
-
-              <div className="space-y-2">
+              </div>              <div className="space-y-2">
                 <Label htmlFor="time" className="flex items-center">
                   Time <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Select
                   value={newAppointment.time}
                   onValueChange={(value) => {
-                    setNewAppointment({ ...newAppointment, time: value })
-                    setFormErrors({ ...formErrors, time: false })
+                    console.log("Time selected:", value);
+                    setNewAppointment({ ...newAppointment, time: value });
+                    setFormErrors({ ...formErrors, time: false });
                   }}
                   disabled={!newAppointment.doctor || !newAppointment.date}
                 >
                   <SelectTrigger className={formErrors.time ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {availableTimeSlots.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
+                    {availableTimeSlots && availableTimeSlots.length > 0 ? (
+                      availableTimeSlots.map((time: string) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      timeSlots.map((time: string) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {formErrors.time && <p className="text-red-500 text-sm">Time is required</p>}
                 {newAppointment.doctor && newAppointment.date && availableTimeSlots.length === 0 && (
                   <p className="text-sm text-red-500">No available time slots for this doctor on the selected date.</p>
                 )}
-              </div>
-
-              <div className="space-y-2">
+              </div>              <div className="space-y-2">
                 <Label htmlFor="reason" className="flex items-center">
                   Reason <span className="text-red-500 ml-1">*</span>
                 </Label>
                 <Select
                   value={newAppointment.reason}
                   onValueChange={(value) => {
-                    setNewAppointment({ ...newAppointment, reason: value })
-                    setFormErrors({ ...formErrors, reason: false })
+                    console.log("Reason selected:", value);
+                    setNewAppointment({ ...newAppointment, reason: value });
+                    setFormErrors({ ...formErrors, reason: false });
                   }}
                 >
                   <SelectTrigger className={formErrors.reason ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select reason" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
                     {appointmentReasons.map((reason) => (
                       <SelectItem key={reason} value={reason}>
                         {reason}
@@ -698,7 +713,7 @@ const handleDeleteAppointment = async (id: string) => {
                   </SelectContent>
                 </Select>
                 {formErrors.reason && <p className="text-red-500 text-sm">Reason is required</p>}
-              </div>              {/* Status field removed as requested */}
+              </div>{/* Status field removed as requested */}
             </div>
             <DialogFooter>
               <DialogClose asChild>

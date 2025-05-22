@@ -10,35 +10,35 @@ import java.time.LocalTime;
 public class Appointment {
     @Id
     private String id;
-      // Schedule information
+    // Schedule information
     private LocalDate date;
-    private LocalTime hour;    
+    private LocalTime hour;
     private String endTimeStr; // For handling the end time string from the frontend
-    
+
     // References to patient and doctor
     @DBRef
     private Patient patient;
-    
+
     @DBRef
     private Doctor doctor;
-    
+
     // Assessment information
     private boolean reportPending;
-      // Medical details
+    // Medical details
     private String diagnosis;
     private String personalNotes; // doctor's notes
     private String plan;
     private String prescription; // medications prescribed to the patient
-    
+
     // Appointment details
     private String location;
     private String reason;
     private boolean upcoming; // true if upcoming, false if past
     private boolean isVaccine; // true if this is a vaccine appointment
-      // Constructors
+    // Constructors
     public Appointment() {
-    }    public Appointment(LocalDate date, LocalTime hour, Patient patient, Doctor doctor, 
-                    String reason, String location, boolean isVaccine) {
+    }    public Appointment(LocalDate date, LocalTime hour, Patient patient, Doctor doctor,
+                            String reason, String location, boolean isVaccine) {
         this.date = date;
         this.hour = hour;
         this.patient = patient;
@@ -50,8 +50,8 @@ public class Appointment {
         this.reportPending = false; // No report pending by default
         this.prescription = null; // No prescription by default
     }
-      public Appointment(LocalDate date, LocalTime hour, String endTimeStr, Patient patient, Doctor doctor, 
-                    String reason, String location, boolean isVaccine) {
+    public Appointment(LocalDate date, LocalTime hour, String endTimeStr, Patient patient, Doctor doctor,
+                       String reason, String location, boolean isVaccine) {
         this.date = date;
         this.hour = hour;
         this.endTimeStr = endTimeStr;
@@ -64,7 +64,7 @@ public class Appointment {
         this.reportPending = false; // No report pending by default
         this.prescription = null; // No prescription by default
     }
-    
+
     // Getters and Setters
     public String getId() {
         return id;
@@ -143,11 +143,11 @@ public class Appointment {
     }    public void setPlan(String plan) {
         this.plan = plan;
     }
-    
+
     public String getPrescription() {
         return prescription;
     }
-    
+
     public void setPrescription(String prescription) {
         this.prescription = prescription;
     }

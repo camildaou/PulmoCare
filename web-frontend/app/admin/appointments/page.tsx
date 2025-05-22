@@ -16,9 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
-import { useState, useEffect } from "react"
-import { Calendar } from "@/components/ui/calendar"
-import { format, isBefore } from "date-fns"
+import { useEffect, useState } from "react"
+import { format, isBefore, formatISO, parseISO } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,37 +30,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-
-// Mock data for doctors
-const doctors = [
-  {
-    id: "1",
-    name: "Dr. John Doe",
-    specialty: "Pulmonologist",
-    schedule: { start: "09:00", end: "17:00", days: [1, 2, 3, 4, 5] },
-  },
-  {
-    id: "2",
-    name: "Dr. Sarah Wilson",
-    specialty: "Respiratory Specialist",
-    schedule: { start: "08:00", end: "16:00", days: [1, 3, 5] },
-  },
-  {
-    id: "3",
-    name: "Dr. Michael Chen",
-    specialty: "Pulmonologist",
-    schedule: { start: "10:00", end: "18:00", days: [2, 4, 5] },
-  },
-]
-
-// Mock data for patients
-const patients = [
-  { id: "1", name: "Alice Johnson", age: 42, condition: "Asthma" },
-  { id: "2", name: "Bob Smith", age: 35, condition: "COPD" },
-  { id: "3", name: "Carol Williams", age: 28, condition: "Bronchitis" },
-  { id: "4", name: "David Brown", age: 50, condition: "Emphysema" },
-  { id: "5", name: "Eve Davis", age: 33, condition: "Asthma" },
-]
+import { useRouter } from "next/navigation"
+import axios from "axios"
+import { Doctor, Patient, Appointment } from "@/lib/types"
+import { adminApi, doctorApi, scheduleApi, appointmentsApi } from "@/lib/api"
+import { Calendar } from "@/components/ui/calendar"
 
 // Appointment reasons
 const appointmentReasons = [
@@ -99,121 +72,21 @@ const timeSlots = [
 ]
 
 export default function AdminAppointmentsPage() {
-  // State for appointments
-  const [upcomingAppointments, setUpcomingAppointments] = useState([
-    {
-      id: 1,
-      date: "Today",
-      time: "09:00 AM",
-      patient: "Alice Johnson",
-      patientId: "1",
-      doctor: "Dr. John Doe",
-      doctorId: "1",
-      reason: "Follow-up",
-      status: "Confirmed",
-      vaccines: "None",
-    },
-    {
-      id: 2,
-      date: "Today",
-      time: "10:30 AM",
-      patient: "Bob Smith",
-      patientId: "2",
-      doctor: "Dr. Sarah Wilson",
-      doctorId: "2",
-      reason: "Initial Consultation",
-      status: "Confirmed",
-      vaccines: "Flu shot reminder",
-    },
-    {
-      id: 3,
-      date: "Tomorrow",
-      time: "01:00 PM",
-      patient: "Carol Williams",
-      patientId: "3",
-      doctor: "Dr. John Doe",
-      doctorId: "1",
-      reason: "Test Results",
-      status: "Confirmed",
-      vaccines: "None",
-    },
-    {
-      id: 4,
-      date: "Mar 30, 2025",
-      time: "02:30 PM",
-      patient: "David Brown",
-      patientId: "4",
-      doctor: "Dr. Michael Chen",
-      doctorId: "3",
-      reason: "Follow-up",
-      status: "Pending",
-      vaccines: "None",
-    },
-    {
-      id: 5,
-      date: "Mar 31, 2025",
-      time: "04:00 PM",
-      patient: "Eve Davis",
-      patientId: "5",
-      doctor: "Dr. John Doe",
-      doctorId: "1",
-      reason: "Respiratory Assessment",
-      status: "Confirmed",
-      vaccines: "Pneumonia vaccine due",
-    },
-  ])
+  const router = useRouter()
 
-  const [pastAppointments, setPastAppointments] = useState([
-    {
-      id: 6,
-      date: "Mar 25, 2025",
-      time: "11:00 AM",
-      patient: "Frank Miller",
-      patientId: "6",
-      doctor: "Dr. John Doe",
-      doctorId: "1",
-      reason: "Follow-up",
-      status: "Completed",
-      vaccines: "None",
-    },
-    {
-      id: 7,
-      date: "Mar 24, 2025",
-      time: "09:30 AM",
-      patient: "Grace Lee",
-      patientId: "7",
-      doctor: "Dr. Sarah Wilson",
-      doctorId: "2",
-      reason: "Asthma Review",
-      status: "Completed",
-      vaccines: "None",
-    },
-  ])
+  // State for appointments
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [pastAppointments, setPastAppointments] = useState<Appointment[]>([])
 
   // State for create appointment form
   const [newAppointment, setNewAppointment] = useState({
-    doctorId: "",
-    patientId: "",
-    date: new Date(),
+    doctor: null as Doctor | null,
+    patient: null as Patient | null,
+    date: "", // Use string for date
     time: "",
     reason: "",
     status: "Pending",
-    vaccines: "",
   })
-
-  // Appointment type
-  type Appointment = {
-    id: number
-    date: string | Date
-    time: string
-    patient: string
-    patientId: string
-    doctor: string
-    doctorId: string
-    reason: string
-    status: string
-    vaccines: string
-  }
 
   // State for edit appointment form
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
@@ -221,11 +94,11 @@ export default function AdminAppointmentsPage() {
   // State to track which dialog is open
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [currentEditId, setCurrentEditId] = useState(null)
-
+  const [currentEditId, setCurrentEditId] = useState<string | null>(null)
+  
   // State for available time slots
-  const [availableTimeSlots, setAvailableTimeSlots] = useState([])
-
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>(timeSlots)
+  
   // State for form validation
   const [formErrors, setFormErrors] = useState({
     doctor: false,
@@ -235,11 +108,18 @@ export default function AdminAppointmentsPage() {
     reason: false,
   })
 
+  // State for patients and doctors
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+
+  // State for the admin user
+  const [admin, setAdmin] = useState<any>(null)
+
   // Function to validate the appointment form
-  const validateAppointmentForm = (appointment) => {
+  const validateAppointmentForm = (appointment: { [key: string]: any }) => {
     const errors = {
-      doctor: !appointment.doctorId,
-      patient: !appointment.patientId,
+      doctor: !appointment.doctor,
+      patient: !appointment.patient,
       date: !appointment.date,
       time: !appointment.time,
       reason: !appointment.reason,
@@ -250,56 +130,76 @@ export default function AdminAppointmentsPage() {
   }
 
   // Function to handle creating a new appointment
-  const handleCreateAppointment = () => {
+  const handleCreateAppointment = async () => {
     // Validate form
     if (!validateAppointmentForm(newAppointment)) {
       toast.error("Please fill in all required fields")
       return
     }
 
-    // Create new appointment
-    const doctor = doctors.find((d) => d.id === newAppointment.doctorId)
-    const patient = patients.find((p) => p.id === newAppointment.patientId)
+    try {
+      // Format the date to ISO string if it's not already
+      const formattedDate = typeof newAppointment.date === 'string' 
+        ? newAppointment.date 
+        : new Date(newAppointment.date).toISOString().split('T')[0];
 
-    const newAppointmentObj = {
-      id: upcomingAppointments.length + pastAppointments.length + 1,
-      date: format(newAppointment.date, "MMM dd, yyyy"),
-      time: newAppointment.time,
-      patient: patient.name,
-      patientId: patient.id,
-      doctor: doctor.name,
-      doctorId: doctor.id,
-      reason: newAppointment.reason,
-      status: newAppointment.status,
-      vaccines: newAppointment.vaccines || "None",
+      // Get the doctor ID and patient ID
+      const doctorId = newAppointment.doctor?.id || '';
+      const patientId = newAppointment.patient?.id || '';
+        
+      // Call the API to create the appointment
+      await import('@/lib/api').then(async ({ createAppointment }) => {
+        const response = await createAppointment(
+          doctorId,
+          patientId,
+          formattedDate,
+          newAppointment.time,
+          newAppointment.reason
+        );
+          
+        // Check if we got an error response about time slot not being available
+        if (response && response.error && response.timeSlotError) {
+          // The alert was already shown in the api.ts file
+          // We just need to return to prevent further processing
+          return;
+        }
+        
+        // Create local appointment object for UI update
+        const newAppointmentObj: Appointment = {
+          id: response.id || `${upcomingAppointments.length + pastAppointments.length + 1}`,
+          date: formattedDate,
+          hour: newAppointment.time,
+          time: newAppointment.time,
+          reason: newAppointment.reason,
+          status: newAppointment.status,
+          doctor: newAppointment.doctor!,
+          patient: newAppointment.patient!,
+        }
+
+        // Add to appointments list
+        const updatedAppointments = [...upcomingAppointments, newAppointmentObj];
+        setUpcomingAppointments(updatedAppointments);
+        
+        // Reset form
+        setNewAppointment({
+          doctor: null,
+          patient: null,
+          date: "",
+          time: "",
+          reason: "",
+          status: "Pending",
+        });
+
+        setCreateDialogOpen(false);
+        toast.success("Appointment created successfully");
+        
+        // Refresh appointments list
+        fetchAllAppointments();
+      });
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      toast.error("Failed to create appointment. Please try again.");
     }
-
-    // Add to appointments list
-    const updatedAppointments = [...upcomingAppointments, newAppointmentObj]
-    setUpcomingAppointments(updatedAppointments)
-
-    // Save to localStorage for doctor portal
-    localStorage.setItem(
-      "pulmocare_appointments",
-      JSON.stringify({
-        upcoming: updatedAppointments,
-        past: pastAppointments,
-      }),
-    )
-
-    // Reset form
-    setNewAppointment({
-      doctorId: "",
-      patientId: "",
-      date: new Date(),
-      time: "",
-      reason: "",
-      status: "Pending",
-      vaccines: "",
-    })
-
-    setCreateDialogOpen(false)
-    toast.success("Appointment created successfully")
   }
 
   // Function to handle editing an appointment
@@ -312,48 +212,55 @@ export default function AdminAppointmentsPage() {
       return
     }
 
-    // Format date for saving
-    const formattedAppointment = { ...editingAppointment }
+    // Ensure `formattedAppointment` includes all required properties
+    const formattedAppointment: Appointment = editingAppointment
+      ? { ...editingAppointment, hour: editingAppointment.time, patient: editingAppointment.patient }
+      : {
+          id: "",
+          doctor: { id: "", name: "" },
+          date: new Date().toISOString(), // Convert to ISO string
+          hour: "",
+          time: "",
+          patient: { id: "", firstName: "", lastName: "", name: "" },
+        }
 
-    if (typeof formattedAppointment.date !== "string") {
+    // Convert `Date` to string for `date` property
+    const handleDateConversion = (date: Date | null): string => {
+      return date ? date.toISOString() : ""
+    }
+
+    // Ensure `formattedAppointment.date` is treated as a string
+    if (formattedAppointment.date) {
       const today = new Date()
       const tomorrow = new Date(today)
       tomorrow.setDate(today.getDate() + 1)
 
-      // Format date as "Today", "Tomorrow", or "MMM dd, yyyy"
-      if (formattedAppointment.date.toDateString() === today.toDateString()) {
+      const appointmentDate = new Date(formattedAppointment.date)
+
+      if (appointmentDate.toDateString() === today.toDateString()) {
         formattedAppointment.date = "Today"
-      } else if (formattedAppointment.date.toDateString() === tomorrow.toDateString()) {
+      } else if (appointmentDate.toDateString() === tomorrow.toDateString()) {
         formattedAppointment.date = "Tomorrow"
       } else {
-        formattedAppointment.date = format(formattedAppointment.date, "MMM dd, yyyy")
+        formattedAppointment.date = format(appointmentDate, "MMM dd, yyyy")
       }
     }
 
     // Update appointment in the appropriate list
-    const isUpcoming = upcomingAppointments.some((app) => app.id === formattedAppointment.id)
+    const isUpcoming = upcomingAppointments.some((app) => app.id.toString() === formattedAppointment.id)
 
     let updatedUpcoming = upcomingAppointments
     let updatedPast = pastAppointments
 
     if (isUpcoming) {
       updatedUpcoming = upcomingAppointments.map((app) =>
-        app.id === formattedAppointment.id ? formattedAppointment : app,
+        app.id.toString() === formattedAppointment.id ? formattedAppointment : app,
       )
       setUpcomingAppointments(updatedUpcoming)
     } else {
-      updatedPast = pastAppointments.map((app) => (app.id === formattedAppointment.id ? formattedAppointment : app))
+      updatedPast = pastAppointments.map((app) => (app.id.toString() === formattedAppointment.id ? formattedAppointment : app))
       setPastAppointments(updatedPast)
     }
-
-    // Save to localStorage for doctor portal
-    localStorage.setItem(
-      "pulmocare_appointments",
-      JSON.stringify({
-        upcoming: updatedUpcoming,
-        past: updatedPast,
-      }),
-    )
 
     // Reset editing state
     setEditingAppointment(null)
@@ -363,92 +270,92 @@ export default function AdminAppointmentsPage() {
   }
 
   // Function to handle deleting an appointment
-  const handleDeleteAppointment = (id) => {
-    // Check if appointment is in upcoming or past list
-    const isUpcoming = upcomingAppointments.some((app) => app.id === id)
-
-    let updatedUpcoming = upcomingAppointments
-    let updatedPast = pastAppointments
-
-    if (isUpcoming) {
-      updatedUpcoming = upcomingAppointments.filter((app) => app.id !== id)
-      setUpcomingAppointments(updatedUpcoming)
-    } else {
-      updatedPast = pastAppointments.filter((app) => app.id !== id)
-      setPastAppointments(updatedPast)
+  const handleDeleteAppointment = async (id: string) => {
+    try {
+      // First, find the appointment to be deleted so we know what we're deleting
+      const appointmentToDelete = [...upcomingAppointments, ...pastAppointments].find(
+        appointment => appointment.id === id
+      );
+      
+      if (!appointmentToDelete) {
+        console.error("Appointment not found:", id);
+        toast.error("Could not find the appointment to delete");
+        return;
+      }
+      
+      console.log("Deleting appointment:", appointmentToDelete);
+      
+      // Call the API to delete the appointment
+      const success = await appointmentsApi.deleteAppointment(id);
+      
+      if (success) {
+        // Remove the deleted appointment from the state
+        setUpcomingAppointments(prev => 
+          prev.filter(appointment => appointment.id !== id)
+        );
+        setPastAppointments(prev => 
+          prev.filter(appointment => appointment.id !== id)
+        );
+        
+        // Let the user know which time slot was restored
+        if (appointmentToDelete.date && appointmentToDelete.hour) {
+          // Format the date to be more readable
+          const date = new Date(appointmentToDelete.date);
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).substring(0, 3).toLowerCase();
+          
+          toast.success(`Appointment deleted and time slot ${appointmentToDelete.hour} on ${dayName} restored to availability`, {
+            duration: 4000
+          });
+        } else {
+          toast.success("Appointment deleted successfully");
+        }
+      } else {
+        toast.error("Failed to delete appointment");
+      }
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      toast.error("Failed to delete appointment. Please try again.");
     }
-
-    // Save to localStorage for doctor portal
-    localStorage.setItem(
-      "pulmocare_appointments",
-      JSON.stringify({
-        upcoming: updatedUpcoming,
-        past: updatedPast,
-      }),
-    )
-
-    setEditDialogOpen(false)
-    setCurrentEditId(null)
-    toast.success("Appointment deleted successfully")
   }
 
   // Function to check if a time slot is available for a doctor on a specific date
-  const isTimeSlotAvailable = (doctorId, date, time, currentAppointmentId = null) => {
-    // Get doctor's schedule
+  const isTimeSlotAvailable = (
+    doctorId: string,
+    date: Date,
+    time: string,
+    currentAppointmentId: string | null = null,
+  ) => {
+    // Get doctor by ID
     const doctor = doctors.find((d) => d.id === doctorId)
     if (!doctor) return false
-
-    // Check if doctor works on this day
-    const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, etc.
-    if (!doctor.schedule.days.includes(dayOfWeek)) return false
-
-    // Check if time is within doctor's working hours
-    const timeHour = Number.parseInt(time.split(":")[0])
-    const startHour = Number.parseInt(doctor.schedule.start.split(":")[0])
-    const endHour = Number.parseInt(doctor.schedule.end.split(":")[0])
-    if (timeHour < startHour || timeHour >= endHour) return false
 
     // Check if doctor already has an appointment at this time
     const formattedDate = format(date, "MMM dd, yyyy")
     const hasConflict = upcomingAppointments.some(
       (app) =>
-        app.doctorId === doctorId && app.date === formattedDate && app.time === time && app.id !== currentAppointmentId,
+        app.doctor.id === doctorId && app.date === formattedDate && app.time === time && app.id.toString() !== currentAppointmentId,
     )
 
     return !hasConflict
   }
 
   // Function to get available time slots for a doctor on a specific date
-  const getAvailableTimeSlots = (doctorId, date, currentAppointmentId = null) => {
-    if (!doctorId || !date) return []
+  const getAvailableTimeSlots = (
+    doctorId: string,
+    date: Date,
+    currentAppointmentId: string | null = null,
+  ) => {
+    if (!doctorId || !date) return timeSlots
 
-    // Get doctor's schedule
-    const doctor = doctors.find((d) => d.id === doctorId)
-    if (!doctor) return []
-
-    // Check if doctor works on this day
-    const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, etc.
-    if (!doctor.schedule.days.includes(dayOfWeek)) return []
-
-    // Filter time slots based on doctor's schedule and existing appointments
+    // Filter time slots based on existing appointments
     return timeSlots.filter((time) => {
-      const timeHour = Number.parseInt(time.split(":")[0])
-      const isPM = time.includes("PM")
-      const hour24 = isPM && timeHour !== 12 ? timeHour + 12 : timeHour
-
-      // Check if time is within doctor's working hours
-      const startHour = Number.parseInt(doctor.schedule.start.split(":")[0])
-      const endHour = Number.parseInt(doctor.schedule.end.split(":")[0])
-      if (hour24 < startHour || hour24 >= endHour) return false
-
-      // Check if doctor already has an appointment at this time
       const formattedDate = format(date, "MMM dd, yyyy")
       const hasConflict = upcomingAppointments.some(
         (app) =>
-          app.doctorId === doctorId &&
+          app.doctor.id === doctorId &&
           app.date === formattedDate &&
           app.time === time &&
-          app.id !== currentAppointmentId,
+          app.id.toString() !== currentAppointmentId,
       )
 
       return !hasConflict
@@ -457,44 +364,186 @@ export default function AdminAppointmentsPage() {
 
   // Update available time slots when doctor or date changes in create form
   useEffect(() => {
-    if (newAppointment.doctorId && newAppointment.date) {
-      setAvailableTimeSlots(getAvailableTimeSlots(newAppointment.doctorId, newAppointment.date))
+    if (newAppointment.doctor?.id && newAppointment.date) {
+      try {
+        const date = parseISO(newAppointment.date);
+        const availableSlots = getAvailableTimeSlots(
+          newAppointment.doctor.id,
+          date
+        );
+        setAvailableTimeSlots(availableSlots);
+        console.log("Available time slots updated:", availableSlots);
+      } catch (error) {
+        console.error("Error updating available time slots:", error);
+        // Fallback to all time slots if there's an error
+        setAvailableTimeSlots(timeSlots);
+      }
+    } else {
+      // Default to all time slots when doctor or date is not selected
+      setAvailableTimeSlots(timeSlots);
     }
-  }, [newAppointment.doctorId, newAppointment.date])
+  }, [newAppointment.doctor?.id, newAppointment.date])
 
   // Update available time slots when doctor or date changes in edit form
   useEffect(() => {
-    if (editingAppointment?.doctorId && editingAppointment?.date) {
-      const date =
-        typeof editingAppointment.date === "string" ? new Date(editingAppointment.date) : editingAppointment.date
-
-      setAvailableTimeSlots(getAvailableTimeSlots(editingAppointment.doctorId, date, editingAppointment.id))
+    if (editingAppointment) {
+      const date = parseISO(editingAppointment.date) // Convert LocalDate to Date
+      const availableSlots = getAvailableTimeSlots(
+        editingAppointment.doctor.id,
+        date,
+        editingAppointment.id.toString()
+      )
+      setAvailableTimeSlots(availableSlots)
     }
-  }, [editingAppointment?.doctorId, editingAppointment?.date])
+  }, [editingAppointment?.doctor.id, editingAppointment?.date])
 
   // Function to initialize editing appointment
-  const initializeEditingAppointment = (appointment) => {
+  const initializeEditingAppointment = (appointment: { [key: string]: any }) => {
     if (currentEditId !== appointment.id) {
       setCurrentEditId(appointment.id)
       setEditingAppointment({
-        ...appointment,
-        date: new Date(
-          appointment.date === "Today"
-            ? new Date()
-            : appointment.date === "Tomorrow"
-              ? new Date(new Date().setDate(new Date().getDate() + 1))
-              : appointment.date,
-        ),
+        id: appointment.id,
+        date: appointment.date, // Keep as LocalDate
+        hour: appointment.hour,
+        time: appointment.time,
+        reason: appointment.reason,
+        status: appointment.status,
+        doctor: appointment.doctor,
+        patient: appointment.patient,
       })
     }
   }
+
+  // Fetch all appointments for all doctors
+  const fetchAllAppointments = async () => {
+    try {
+      // Get all doctors first
+      const allDoctors = await doctorApi.getAllDoctors();
+      
+      // Create arrays to store appointments
+      let upcoming: Appointment[] = [];
+      let past: Appointment[] = [];
+      
+      // Get today's date for comparison
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // For each doctor, fetch their appointments
+      for (const doctor of allDoctors) {
+        const doctorAppointments = await doctorApi.getAppointmentsByDoctorId(doctor.id);
+        
+        // Split appointments into upcoming and past
+        if (Array.isArray(doctorAppointments)) {
+          doctorAppointments.forEach((appt: Appointment) => {
+            const appointmentDate = new Date(appt.date);
+            if (appointmentDate >= today) {
+              upcoming.push(appt);
+            } else {
+              past.push(appt);
+            }
+          });
+        }
+      }
+      
+      // Update state with all appointments
+      setUpcomingAppointments(upcoming);
+      setPastAppointments(past);
+      
+      console.log(`Loaded ${upcoming.length} upcoming and ${past.length} past appointments for all doctors`);
+    } catch (error) {
+      console.error("Error fetching all appointments:", error);
+      toast.error("Failed to fetch appointments. Please try again later.");
+    }
+  };
+
+  // Fetch all doctors
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const doctorsData = await doctorApi.getAllDoctors();
+        // Make sure each doctor has a name property
+        const doctorsWithNames = doctorsData.map((doctor: any) => ({
+          ...doctor,
+          name: doctor.name || `${doctor.firstName} ${doctor.lastName}`
+        }));
+        setDoctors(doctorsWithNames);
+        console.log(`Loaded ${doctorsWithNames.length} doctors for appointment creation`);
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+        toast.error("Failed to load doctor list. Please try again.");
+      }
+    };
+
+    fetchDoctors();
+  }, []);
+
+  // Fetch all patients
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const patientsData = await adminApi.getAllPatients();
+        // Make sure each patient has a name property
+        const patientsWithNames = patientsData.map((patient: any) => ({
+          ...patient,
+          name: patient.name || `${patient.firstName} ${patient.lastName}`
+        }));
+        setPatients(patientsWithNames);
+        console.log(`Loaded ${patientsWithNames.length} patients for appointment creation`);
+      } catch (error) {
+        console.error("Error fetching patients:", error);
+        toast.error("Failed to load patient list. Please try again.");
+      }
+    };
+
+    fetchPatients();
+  }, []);
+
+  // Fetch admin profile and all appointments on mount
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        // Get user info from localStorage
+        const userInfo = localStorage.getItem("pulmocare_user");
+        
+        if (!userInfo) {
+          console.error("User info not found in localStorage");
+          toast.error("You are not logged in. Redirecting to login page.");
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Parse the JSON user data
+        const user = JSON.parse(userInfo);
+        
+        if (!user.id) {
+          console.error("User ID not found in localStorage data");
+          toast.error("Invalid user data. Please log in again.");
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Use adminApi to fetch the admin's profile
+        const adminData = await adminApi.getProfile(user.id);
+        setAdmin(adminData);
+        
+        // Fetch all appointments
+        await fetchAllAppointments();
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+        toast.error("Failed to load admin data. Please log in again.");
+        router.push('/admin/login');
+      }
+    };
+
+    fetchAdminData();
+  }, [router]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Appointments</h1>
-          <p className="text-muted-foreground">Manage clinic appointments.</p>
+          <p className="text-muted-foreground">Manage clinic appointments for all doctors</p>
         </div>
 
         {/* Create Appointment Dialog */}
@@ -503,13 +552,12 @@ export default function AdminAppointmentsPage() {
             <Button
               onClick={() => {
                 setNewAppointment({
-                  doctorId: "",
-                  patientId: "",
-                  date: new Date(),
+                  doctor: null,
+                  patient: null,
+                  date: new Date().toISOString().split('T')[0], // Simple date string format
                   time: "",
                   reason: "",
-                  status: "Pending",
-                  vaccines: "",
+                  status: "Pending", // Default status (hidden from form)
                 })
                 setFormErrors({
                   doctor: false,
@@ -529,135 +577,87 @@ export default function AdminAppointmentsPage() {
               <DialogTitle>Create New Appointment</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="doctor" className="flex items-center">
-                    Doctor <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <Select
-                    value={newAppointment.doctorId}
-                    onValueChange={(value) => {
-                      setNewAppointment({ ...newAppointment, doctorId: value, time: "" })
-                      setFormErrors({ ...formErrors, doctor: false })
-                    }}
-                  >
-                    <SelectTrigger className={formErrors.doctor ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select doctor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {doctors.map((doctor) => (
+              <div className="space-y-2">
+                <Label htmlFor="doctor" className="flex items-center">
+                  Doctor <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select
+                  value={newAppointment.doctor?.id}
+                  onValueChange={(value) => {
+                    const selectedDoctor = doctors.find((doc) => doc.id === value) || null
+                    setNewAppointment({ ...newAppointment, doctor: selectedDoctor, time: "" })
+                    setFormErrors({ ...formErrors, doctor: false })
+                  }}
+                >
+                  <SelectTrigger className={formErrors.doctor ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select doctor" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
+                    {doctors.length > 0 ? (
+                      doctors.map((doctor) => (
                         <SelectItem key={doctor.id} value={doctor.id}>
-                          {doctor.name}
+                          Dr. {doctor.firstName} {doctor.lastName}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.doctor && <p className="text-red-500 text-sm">Doctor is required</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="patient" className="flex items-center">
-                    Patient <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <Select
-                    value={newAppointment.patientId}
-                    onValueChange={(value) => {
-                      setNewAppointment({ ...newAppointment, patientId: value })
-                      setFormErrors({ ...formErrors, patient: false })
-                    }}
-                  >
-                    <SelectTrigger className={formErrors.patient ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select patient" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patients.map((patient) => (
+                      ))
+                    ) : (
+                      <SelectItem value="loading" disabled>Loading doctors...</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {formErrors.doctor && <p className="text-red-500 text-sm">Doctor is required</p>}
+                {doctors.length === 0 && <p className="text-sm text-amber-500">Loading doctor list...</p>}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="patient" className="flex items-center">
+                  Patient <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select
+                  value={newAppointment.patient?.id}
+                  onValueChange={(value) => {
+                    const selectedPatient = patients.find((pat) => pat.id === value) || null
+                    setNewAppointment({ ...newAppointment, patient: selectedPatient })
+                    setFormErrors({ ...formErrors, patient: false })
+                  }}
+                >
+                  <SelectTrigger className={formErrors.patient ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select patient" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
+                    {patients.length > 0 ? (
+                      patients.map((patient) => (
                         <SelectItem key={patient.id} value={patient.id}>
-                          {patient.name}
+                          {patient.name || `${patient.firstName} ${patient.lastName}`}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.patient && <p className="text-red-500 text-sm">Patient is required</p>}
-                </div>
+                      ))
+                    ) : (
+                      <SelectItem value="loading" disabled>Loading patients...</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {formErrors.patient && <p className="text-red-500 text-sm">Patient is required</p>}
+                {patients.length === 0 && <p className="text-sm text-amber-500">Loading patient list...</p>}
               </div>
 
               <div className="space-y-2">
-                <Label className="flex items-center">
+                <Label htmlFor="date" className="flex items-center">
                   Date <span className="text-red-500 ml-1">*</span>
                 </Label>
-                <div className={`border rounded-md p-2 ${formErrors.date ? "border-red-500" : ""}`}>
-                  <Calendar
-                    mode="single"
-                    selected={newAppointment.date}
-                    onSelect={(date) => {
-                      setNewAppointment({ ...newAppointment, date, time: "" })
-                      setFormErrors({ ...formErrors, date: false })
-                    }}
-                    disabled={(date) => {
-                      // Disable past dates and weekends if doctor doesn't work
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-
-                      if (isBefore(date, today)) return true
-
-                      if (newAppointment.doctorId) {
-                        const doctor = doctors.find((d) => d.id === newAppointment.doctorId)
-                        if (doctor && !doctor.schedule.days.includes(date.getDay())) {
-                          return true
-                        }
-                      }
-
-                      return false
-                    }}
-                    classNames={{
-                      months: "flex flex-col space-y-4",
-                      month: "space-y-4",
-                      caption: "flex justify-center pt-1 relative items-center",
-                      caption_label: "text-sm font-medium",
-                      nav: "space-x-1 flex items-center",
-                      nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
-                      nav_button_previous: "absolute left-1",
-                      nav_button_next: "absolute right-1",
-                      table: "w-full border-collapse space-y-1",
-                      head_row: "flex",
-                      head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-                      row: "flex w-full mt-2",
-                      cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                      day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                      day_range_end: "day-range-end",
-                      day_selected:
-                        "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                      day_today: "bg-accent text-accent-foreground",
-                      day_outside: "day-outside text-muted-foreground opacity-50",
-                      day_disabled: "text-muted-foreground opacity-50",
-                      day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                      day_hidden: "invisible",
-                    }}
-                  />
-                </div>
+                <Input
+                  id="date"
+                  type="date"
+                  className={formErrors.date ? "border-red-500" : ""}
+                  value={newAppointment.date ? new Date(newAppointment.date).toISOString().split('T')[0] : ""}
+                  onChange={(e) => {
+                    const selectedDate = e.target.value;
+                    setNewAppointment({ ...newAppointment, date: selectedDate, time: "" });
+                    setFormErrors({ ...formErrors, date: false });
+                  }}
+                  min={new Date().toISOString().split('T')[0]} // Disable past dates
+                />
                 {formErrors.date && <p className="text-red-500 text-sm">Date is required</p>}
-                {newAppointment.doctorId && newAppointment.date && (
-                  <div className="text-sm mt-1">
-                    <p className="font-medium">Doctor's Schedule:</p>
-                    {(() => {
-                      const doctor = doctors.find((d) => d.id === newAppointment.doctorId)
-                      if (doctor) {
-                        const dayOfWeek = newAppointment.date.getDay()
-                        if (doctor.schedule.days.includes(dayOfWeek)) {
-                          return (
-                            <p className="text-green-600">
-                              Available from {doctor.schedule.start} to {doctor.schedule.end}
-                            </p>
-                          )
-                        } else {
-                          return <p className="text-red-500">Doctor is not available on this day</p>
-                        }
-                      }
-                      return null
-                    })()}
-                  </div>
-                )}
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="time" className="flex items-center">
                   Time <span className="text-red-500 ml-1">*</span>
@@ -665,28 +665,37 @@ export default function AdminAppointmentsPage() {
                 <Select
                   value={newAppointment.time}
                   onValueChange={(value) => {
-                    setNewAppointment({ ...newAppointment, time: value })
-                    setFormErrors({ ...formErrors, time: false })
+                    console.log("Time selected:", value);
+                    setNewAppointment({ ...newAppointment, time: value });
+                    setFormErrors({ ...formErrors, time: false });
                   }}
-                  disabled={!newAppointment.doctorId || !newAppointment.date}
+                  disabled={!newAppointment.doctor || !newAppointment.date}
                 >
                   <SelectTrigger className={formErrors.time ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {availableTimeSlots.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
+                    {availableTimeSlots && availableTimeSlots.length > 0 ? (
+                      availableTimeSlots.map((time: string) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      timeSlots.map((time: string) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {formErrors.time && <p className="text-red-500 text-sm">Time is required</p>}
-                {newAppointment.doctorId && newAppointment.date && availableTimeSlots.length === 0 && (
+                {newAppointment.doctor && newAppointment.date && availableTimeSlots.length === 0 && (
                   <p className="text-sm text-red-500">No available time slots for this doctor on the selected date.</p>
                 )}
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="reason" className="flex items-center">
                   Reason <span className="text-red-500 ml-1">*</span>
@@ -694,14 +703,15 @@ export default function AdminAppointmentsPage() {
                 <Select
                   value={newAppointment.reason}
                   onValueChange={(value) => {
-                    setNewAppointment({ ...newAppointment, reason: value })
-                    setFormErrors({ ...formErrors, reason: false })
+                    console.log("Reason selected:", value);
+                    setNewAppointment({ ...newAppointment, reason: value });
+                    setFormErrors({ ...formErrors, reason: false });
                   }}
                 >
                   <SelectTrigger className={formErrors.reason ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select reason" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px] overflow-y-auto" position="item-aligned">
                     {appointmentReasons.map((reason) => (
                       <SelectItem key={reason} value={reason}>
                         {reason}
@@ -710,32 +720,6 @@ export default function AdminAppointmentsPage() {
                   </SelectContent>
                 </Select>
                 {formErrors.reason && <p className="text-red-500 text-sm">Reason is required</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={newAppointment.status}
-                  onValueChange={(value) => setNewAppointment({ ...newAppointment, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Confirmed">Confirmed</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="vaccine">Vaccine Reminder (Optional)</Label>
-                <Input
-                  id="vaccine"
-                  placeholder="Add vaccine reminder"
-                  value={newAppointment.vaccines}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, vaccines: e.target.value })}
-                />
               </div>
             </div>
             <DialogFooter>
@@ -753,369 +737,88 @@ export default function AdminAppointmentsPage() {
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           <TabsTrigger value="past">Past</TabsTrigger>
         </TabsList>
-
+        
         <TabsContent value="upcoming" className="space-y-4 pt-4">
           {upcomingAppointments.map((appointment) => (
             <Card key={appointment.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="grid gap-1">
-                    <div className="font-semibold">{appointment.patient}</div>
-                    <div className="text-sm text-muted-foreground">{appointment.reason}</div>
-                    <div className="text-sm">{appointment.doctor}</div>
+                    <div className="font-semibold">
+                      {appointment.patient.firstName} {appointment.patient.lastName}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">Reason:</span> {appointment.reason}
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-medium">Doctor:</span> Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
+                    </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <span>{appointment.date}</span>
+                      <span>
+                        <span className="font-medium">Date:</span> {appointment.date}
+                      </span>
                       <span>•</span>
-                      <span>{appointment.time}</span>
-                      <span>•</span>
-                      <span className={appointment.status === "Confirmed" ? "text-green-500" : "text-amber-500"}>
-                        {appointment.status}
+                      <span>
+                        <span className="font-medium">Time:</span> {appointment.hour}
                       </span>
                     </div>
-                    {appointment.vaccines !== "None" && (
-                      <div className="text-sm text-secondary">Vaccine: {appointment.vaccines}</div>
-                    )}
                   </div>
-
+                  
                   <div className="flex gap-2">
-                    {/* Edit Dialog */}
-                    <Dialog
-                      open={editDialogOpen && currentEditId === appointment.id}
-                      onOpenChange={(open) => {
-                        setEditDialogOpen(open)
-                        if (open) {
-                          initializeEditingAppointment(appointment)
-                          setFormErrors({
-                            doctor: false,
-                            patient: false,
-                            date: false,
-                            time: false,
-                            reason: false,
-                          })
-                        } else {
-                          setCurrentEditId(null)
-                        }
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditDialogOpen(true)
+                        initializeEditingAppointment(appointment)
                       }}
                     >
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditDialogOpen(true)
-                            initializeEditingAppointment(appointment)
-                            setFormErrors({
-                              doctor: false,
-                              patient: false,
-                              date: false,
-                              time: false,
-                              reason: false,
-                            })
-                          }}
-                        >
-                          Edit
+                      Edit
+                    </Button>
+
+                    <Link href={`/admin/doctors/schedule/${appointment.doctor.id}`} className="w-full h-full">
+                      <Button variant="outline" size="sm" className="flex items-center justify-center">
+                        Doctor's Schedule
+                      </Button>
+                    </Link>
+
+                    <Link href={`/admin/patients/${appointment.patient.id}`} className="w-full h-full">
+                      <Button variant="outline" size="sm" className="flex items-center justify-center">
+                        View Patient
+                      </Button>
+                    </Link>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          Delete
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Appointment</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          {editingAppointment && editingAppointment.id === appointment.id && (
-                            <>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="doctor" className="flex items-center">
-                                    Doctor <span className="text-red-500 ml-1">*</span>
-                                  </Label>
-                                  <Select
-                                    value={editingAppointment.doctorId}
-                                    onValueChange={(value) => {
-                                      setEditingAppointment({
-                                        ...editingAppointment,
-                                        doctorId: value,
-                                        doctor: doctors.find((d) => d.id === value)?.name || "",
-                                        time: "", // Reset time when doctor changes
-                                      })
-                                      setFormErrors({ ...formErrors, doctor: false })
-                                    }}
-                                  >
-                                    <SelectTrigger className={formErrors.doctor ? "border-red-500" : ""}>
-                                      <SelectValue placeholder="Select doctor" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {doctors.map((doctor) => (
-                                        <SelectItem key={doctor.id} value={doctor.id}>
-                                          {doctor.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  {formErrors.doctor && <p className="text-red-500 text-sm">Doctor is required</p>}
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="patient" className="flex items-center">
-                                    Patient <span className="text-red-500 ml-1">*</span>
-                                  </Label>
-                                  <Select
-                                    value={editingAppointment.patientId}
-                                    onValueChange={(value) => {
-                                      setEditingAppointment({
-                                        ...editingAppointment,
-                                        patientId: value,
-                                        patient: patients.find((p) => p.id === value)?.name || "",
-                                      })
-                                      setFormErrors({ ...formErrors, patient: false })
-                                    }}
-                                  >
-                                    <SelectTrigger className={formErrors.patient ? "border-red-500" : ""}>
-                                      <SelectValue placeholder="Select patient" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {patients.map((patient) => (
-                                        <SelectItem key={patient.id} value={patient.id}>
-                                          {patient.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  {formErrors.patient && <p className="text-red-500 text-sm">Patient is required</p>}
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="flex items-center">
-                                  Date <span className="text-red-500 ml-1">*</span>
-                                </Label>
-                                <div className={`border rounded-md p-2 ${formErrors.date ? "border-red-500" : ""}`}>
-                                  <Calendar
-                                    mode="single"
-                                    selected={
-                                      typeof editingAppointment.date === "string"
-                                        ? new Date(editingAppointment.date)
-                                        : editingAppointment.date
-                                    }
-                                    onSelect={(date) => {
-                                      setEditingAppointment({
-                                        ...editingAppointment,
-                                        date,
-                                        time: "", // Reset time when date changes
-                                      })
-                                      setFormErrors({ ...formErrors, date: false })
-                                    }}
-                                    disabled={(date) => {
-                                      // Disable past dates and weekends if doctor doesn't work
-                                      const today = new Date()
-                                      today.setHours(0, 0, 0, 0)
-
-                                      if (isBefore(date, today)) return true
-
-                                      if (editingAppointment.doctorId) {
-                                        const doctor = doctors.find((d) => d.id === editingAppointment.doctorId)
-                                        if (doctor && !doctor.schedule.days.includes(date.getDay())) {
-                                          return true
-                                        }
-                                      }
-
-                                      return false
-                                    }}
-                                    classNames={{
-                                      months: "flex flex-col space-y-4",
-                                      month: "space-y-4",
-                                      caption: "flex justify-center pt-1 relative items-center",
-                                      caption_label: "text-sm font-medium",
-                                      nav: "space-x-1 flex items-center",
-                                      nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
-                                      nav_button_previous: "absolute left-1",
-                                      nav_button_next: "absolute right-1",
-                                      table: "w-full border-collapse space-y-1",
-                                      head_row: "flex",
-                                      head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-                                      row: "flex w-full mt-2",
-                                      cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                                      day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                                      day_range_end: "day-range-end",
-                                      day_selected:
-                                        "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                                      day_today: "bg-accent text-accent-foreground",
-                                      day_outside: "day-outside text-muted-foreground opacity-50",
-                                      day_disabled: "text-muted-foreground opacity-50",
-                                      day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                                      day_hidden: "invisible",
-                                    }}
-                                  />
-                                </div>
-                                {formErrors.date && <p className="text-red-500 text-sm">Date is required</p>}
-                                {editingAppointment.doctorId && editingAppointment.date && (
-                                  <div className="text-sm mt-1">
-                                    <p className="font-medium">Doctor's Schedule:</p>
-                                    {(() => {
-                                      const doctor = doctors.find((d) => d.id === editingAppointment.doctorId)
-                                      if (doctor) {
-                                        const date =
-                                          typeof editingAppointment.date === "string"
-                                            ? new Date(editingAppointment.date)
-                                            : editingAppointment.date
-                                        const dayOfWeek = date.getDay()
-                                        if (doctor.schedule.days.includes(dayOfWeek)) {
-                                          return (
-                                            <p className="text-green-600">
-                                              Available from {doctor.schedule.start} to {doctor.schedule.end}
-                                            </p>
-                                          )
-                                        } else {
-                                          return <p className="text-red-500">Doctor is not available on this day</p>
-                                        }
-                                      }
-                                      return null
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="time" className="flex items-center">
-                                  Time <span className="text-red-500 ml-1">*</span>
-                                </Label>
-                                <Select
-                                  value={editingAppointment.time}
-                                  onValueChange={(value) => {
-                                    setEditingAppointment({ ...editingAppointment, time: value })
-                                    setFormErrors({ ...formErrors, time: false })
-                                  }}
-                                >
-                                  <SelectTrigger className={formErrors.time ? "border-red-500" : ""}>
-                                    <SelectValue placeholder="Select time" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableTimeSlots.map((time) => (
-                                      <SelectItem key={time} value={time}>
-                                        {time}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {formErrors.time && <p className="text-red-500 text-sm">Time is required</p>}
-                                {editingAppointment.doctorId &&
-                                  editingAppointment.date &&
-                                  availableTimeSlots.length === 0 && (
-                                    <p className="text-sm text-red-500">
-                                      No available time slots for this doctor on the selected date.
-                                    </p>
-                                  )}
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="reason" className="flex items-center">
-                                  Reason <span className="text-red-500 ml-1">*</span>
-                                </Label>
-                                <Select
-                                  value={editingAppointment.reason}
-                                  onValueChange={(value) => {
-                                    setEditingAppointment({ ...editingAppointment, reason: value })
-                                    setFormErrors({ ...formErrors, reason: false })
-                                  }}
-                                >
-                                  <SelectTrigger className={formErrors.reason ? "border-red-500" : ""}>
-                                    <SelectValue placeholder="Select reason" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {appointmentReasons.map((reason) => (
-                                      <SelectItem key={reason} value={reason}>
-                                        {reason}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {formErrors.reason && <p className="text-red-500 text-sm">Reason is required</p>}
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="status">Status</Label>
-                                <Select
-                                  value={editingAppointment.status}
-                                  onValueChange={(value) =>
-                                    setEditingAppointment({ ...editingAppointment, status: value })
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Confirmed">Confirmed</SelectItem>
-                                    <SelectItem value="Pending">Pending</SelectItem>
-                                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="vaccine">Vaccine Reminder</Label>
-                                <Input
-                                  id="vaccine"
-                                  placeholder="Add vaccine reminder"
-                                  value={editingAppointment.vaccines}
-                                  onChange={(e) =>
-                                    setEditingAppointment({ ...editingAppointment, vaccines: e.target.value })
-                                  }
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        <DialogFooter>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive">Delete</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the appointment.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => {
-                                    handleDeleteAppointment(appointment.id)
-                                  }}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-
-                          <DialogClose asChild>
-                            <Button variant="outline">Cancel</Button>
-                          </DialogClose>
-
-                          <Button onClick={handleEditAppointment}>Save Changes</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* Doctor's Schedule Link */}
-                    <Link href={`/admin/doctors/schedule/${appointment.doctorId}`} className="w-full h-full">
-  <Button variant="outline" size="sm" className="flex items-center justify-center">
-    Doctor's Schedule
-  </Button>
-</Link>
-
-{/* View Patient Link */}
-<Link href={`/admin/patients/${appointment.patientId}`} className="w-full h-full">
-  <Button variant="outline" size="sm" className="flex items-center justify-center">
-    View Patient
-  </Button>
-</Link>
-
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-[350px]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
+                          <AlertDialogDescription className="text-sm">
+                            Are you sure you want to delete this appointment?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="space-x-2 pt-2">
+                          <AlertDialogCancel className="h-8">Cancel</AlertDialogCancel>
+                          <AlertDialogAction className="h-8 px-3" onClick={() => handleDeleteAppointment(appointment.id)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+          {upcomingAppointments.length === 0 && (
+            <div className="text-center p-8 border rounded-lg bg-gray-50">
+              <p className="text-muted-foreground">No upcoming appointments found.</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="past" className="space-y-4 pt-4">
@@ -1124,35 +827,66 @@ export default function AdminAppointmentsPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="grid gap-1">
-                    <div className="font-semibold">{appointment.patient}</div>
-                    <div className="text-sm text-muted-foreground">{appointment.reason}</div>
-                    <div className="text-sm">{appointment.doctor}</div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span>{appointment.date}</span>
-                      <span>•</span>
-                      <span>{appointment.time}</span>
-                      <span>•</span>
-                      <span className="text-green-500">{appointment.status}</span>
+                    <div className="font-semibold">
+                      {appointment.patient.firstName} {appointment.patient.lastName}
                     </div>
-                    {appointment.vaccines !== "None" && (
-                      <div className="text-sm text-secondary">Vaccine: {appointment.vaccines}</div>
-                    )}
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">Reason:</span> {appointment.reason}
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-medium">Doctor:</span> Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span>
+                        <span className="font-medium">Date:</span> {appointment.date}
+                      </span>
+                      <span>•</span>
+                      <span>
+                        <span className="font-medium">Time:</span> {appointment.hour}
+                      </span>
+                    </div>
                   </div>
-
+                  
                   <div className="flex gap-2">
-<Link href={`/admin/doctors/schedule/${appointment.doctorId}`}>
-  <Button variant="outline" size="sm">Doctor's Schedule</Button>
-</Link>
+                    <Link href={`/admin/doctors/schedule/${appointment.doctor.id}`}>
+                      <Button variant="outline" size="sm">Doctor's Schedule</Button>
+                    </Link>
 
-<Link href={`/admin/patients/${appointment.patientId}`}>
-  <Button variant="outline" size="sm">View Patient</Button>
-</Link>
-
+                    <Link href={`/admin/patients/${appointment.patient.id}`}>
+                      <Button variant="outline" size="sm">View Patient</Button>
+                    </Link>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-[350px]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
+                          <AlertDialogDescription className="text-sm">
+                            Are you sure you want to delete this appointment?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="space-x-2 pt-2">
+                          <AlertDialogCancel className="h-8">Cancel</AlertDialogCancel>
+                          <AlertDialogAction className="h-8 px-3" onClick={() => handleDeleteAppointment(appointment.id)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+          {pastAppointments.length === 0 && (
+            <div className="text-center p-8 border rounded-lg bg-gray-50">
+              <p className="text-muted-foreground">No past appointments found.</p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

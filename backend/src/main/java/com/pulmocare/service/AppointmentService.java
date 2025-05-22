@@ -242,23 +242,15 @@ private void restoreTimeSlotToDoctor(Appointment appointment) {
                 .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
         
         // Get the day of the week from the appointment date
-        LocalDate appointmentDate = LocalDate.parse(appointment.getDate());
+        LocalDate appointmentDate = appointment.getDate(); // Already a LocalDate
         String dayName = appointmentDate.getDayOfWeek().toString().substring(0, 3).toLowerCase();
           // Get the start and end times
-        String appointmentHour = appointment.getHour();
-        String startTimeStr;
-        
-        // Check if appointmentHour is a LocalTime or a String
-        if (appointmentHour instanceof String) {
-            // Format might be "08:00 AM" or "08:00"
-            startTimeStr = convertToStandardTimeFormat(appointmentHour);
-        } else {
-            // Handle case where appointmentHour is a LocalTime
-            startTimeStr = appointmentHour;
-        }
+        LocalTime appointmentHour = appointment.getHour();
+          // Check if appointmentHour is a LocalTime or a String
+        String startTimeStr = appointmentHour.format(DateTimeFormatter.ofPattern("HH:mm"));
         
         // Calculate end time (assuming 30-minute appointments)
-        LocalTime startTime = LocalTime.parse(startTimeStr);
+        LocalTime startTime = appointmentHour;
         LocalTime endTime = startTime.plusMinutes(30);
         String endTimeStr = endTime.format(DateTimeFormatter.ofPattern("HH:mm"));
           // Get the doctor's availability for that day
@@ -327,7 +319,7 @@ private String convertToStandardTimeFormat(String timeStr) {
      * Validate if the patient and doctor in the appointment exist
      */
     private void validatePatientAndDoctor(Appointment appointment) {
-```
+
         if (appointment.getPatient() != null && appointment.getPatient().getId() != null) {
             Patient patient = patientRepository.findById(appointment.getPatient().getId())
                 .orElseThrow(() -> new RuntimeException("Patient not found with id: " + appointment.getPatient().getId()));

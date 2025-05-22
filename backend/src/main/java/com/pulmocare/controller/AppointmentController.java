@@ -16,32 +16,32 @@ import java.util.Map;
 @RequestMapping("/api/appointments")
 @CrossOrigin(origins = "*")
 public class AppointmentController {
-    
+
     @Autowired
     private AppointmentService appointmentService;
-      /**
+    /**
      * Create a new appointment
      */
     @PostMapping
     public ResponseEntity<Appointment> createAppointment(@RequestBody Appointment appointment) {
-    try {
-        // Log the incoming appointment data for debugging
-        System.out.println("Creating appointment with: " + 
-                          "Date=" + appointment.getDate() + 
-                          ", StartTime=" + appointment.getHour() + 
-                          ", EndTime=" + appointment.getEndTimeStr() +
-                          ", DoctorId=" + (appointment.getDoctor() != null ? appointment.getDoctor().getId() : "null"));
-        
-        Appointment newAppointment = appointmentService.createAppointment(appointment);
-        return new ResponseEntity<>(newAppointment, HttpStatus.CREATED);
-    } catch (Exception e) {
-        // Log the detailed error information
-        System.err.println("Error creating appointment: " + e.getMessage());
-        e.printStackTrace();
-        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
+        try {
+            // Log the incoming appointment data for debugging
+            System.out.println("Creating appointment with: " +
+                    "Date=" + appointment.getDate() +
+                    ", StartTime=" + appointment.getHour() +
+                    ", EndTime=" + appointment.getEndTimeStr() +
+                    ", DoctorId=" + (appointment.getDoctor() != null ? appointment.getDoctor().getId() : "null"));
+
+            Appointment newAppointment = appointmentService.createAppointment(appointment);
+            return new ResponseEntity<>(newAppointment, HttpStatus.CREATED);
+        } catch (Exception e) {
+            // Log the detailed error information
+            System.err.println("Error creating appointment: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
+        }
     }
-}
-    
+
     /**
      * Get all appointments
      */
@@ -54,7 +54,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get appointment by ID
      */
@@ -69,7 +69,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get appointments by patient ID
      */
@@ -82,7 +82,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get appointments by doctor ID
      */
@@ -95,7 +95,7 @@ public class AppointmentController {
             return new ResponseEntity<>(null,HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get upcoming appointments by patient ID
      */
@@ -108,7 +108,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get past appointments by patient ID
      */
@@ -121,7 +121,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get upcoming appointments by doctor ID
      */
@@ -134,7 +134,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get past appointments by doctor ID
      */
@@ -147,7 +147,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get appointments by date
      */
@@ -161,7 +161,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Get appointments by doctor and date
      */
@@ -176,7 +176,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Update appointment
      */
@@ -191,7 +191,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Mark appointment as past
      */
@@ -206,7 +206,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Return only the status for error cases
         }
     }
-    
+
     /**
      * Delete appointment
      */
@@ -230,8 +230,8 @@ public class AppointmentController {
             appointmentService.updateAppointmentStatuses();
             return new ResponseEntity<>("Appointment statuses updated successfully", HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<>("Error updating appointment statuses: " + e.getMessage(), 
-                                       HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("Error updating appointment statuses: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -248,9 +248,9 @@ public class AppointmentController {
             System.out.println("Validating time slot for Doctor ID: " + appointment.getDoctor().getId() + ", Date: " + appointment.getDate() + ", Time: " + appointment.getHour());
 
             boolean isAvailable = appointmentService.isTimeSlotAvailable(
-                appointment.getDoctor().getId(), 
-                appointment.getDate(), 
-                appointment.getHour().toString() // Convert LocalTime to String
+                    appointment.getDoctor().getId(),
+                    appointment.getDate(),
+                    appointment.getHour().toString() // Convert LocalTime to String
             );            // Log the result of the validation
             System.out.println("Time slot availability: " + isAvailable);
 
@@ -303,7 +303,7 @@ public class AppointmentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     /**
      * Get today's appointments for a doctor
      */
