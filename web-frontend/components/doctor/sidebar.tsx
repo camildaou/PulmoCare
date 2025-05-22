@@ -43,13 +43,12 @@ export function Sidebar() {
     },
 
   ]
-
   const handleLogout = () => {
     router.push("/")
   }
-
+  
   return (
-    <div className="flex h-screen w-[240px] flex-col border-r bg-blue-800 text-white">
+    <div className="fixed h-screen w-[240px] flex flex-col border-r bg-blue-800 text-white">
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/doctor" className="flex items-center gap-2 font-semibold">
           <Stethoscope className="h-6 w-6" />

@@ -33,10 +33,7 @@ public class Patient {
     private boolean isSmoking;
     
     // Medical History
-    private List<String> previousDiagnosis;
-    private List<String> previousPlans;
-    private List<String> previousPrescriptions;
-    private List<String> previousResources;
+
     private String symptomsAssessment;
     private String report;
     
@@ -193,38 +190,6 @@ public class Patient {
 
     public void setSmoking(boolean isSmoking) {
         this.isSmoking = isSmoking;
-    }
-
-    public List<String> getPreviousDiagnosis() {
-        return previousDiagnosis;
-    }
-
-    public void setPreviousDiagnosis(List<String> previousDiagnosis) {
-        this.previousDiagnosis = previousDiagnosis;
-    }
-
-    public List<String> getPreviousPlans() {
-        return previousPlans;
-    }
-
-    public void setPreviousPlans(List<String> previousPlans) {
-        this.previousPlans = previousPlans;
-    }
-
-    public List<String> getPreviousPrescriptions() {
-        return previousPrescriptions;
-    }
-
-    public void setPreviousPrescriptions(List<String> previousPrescriptions) {
-        this.previousPrescriptions = previousPrescriptions;
-    }
-
-    public List<String> getPreviousResources() {
-        return previousResources;
-    }
-
-    public void setPreviousResources(List<String> previousResources) {
-        this.previousResources = previousResources;
     }
 
     public String getSymptomsAssessment() {

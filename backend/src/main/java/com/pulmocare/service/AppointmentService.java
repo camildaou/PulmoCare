@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -177,14 +179,13 @@ public class AppointmentService {
             appointment.setHour(appointmentDetails.getHour());
         }
         
-        if (appointmentDetails.getAssessmentInfo() != null) {
-            appointment.setAssessmentInfo(appointmentDetails.getAssessmentInfo());
+        appointment.setReportPending(appointmentDetails.isReportPending());
+          if (appointmentDetails.getDiagnosis() != null) {
+            appointment.setDiagnosis(appointmentDetails.getDiagnosis());
         }
         
-        appointment.setReportPending(appointmentDetails.isReportPending());
-        
-        if (appointmentDetails.getDiagnosis() != null) {
-            appointment.setDiagnosis(appointmentDetails.getDiagnosis());
+        if (appointmentDetails.getPrescription() != null) {
+            appointment.setPrescription(appointmentDetails.getPrescription());
         }
         
         if (appointmentDetails.getPersonalNotes() != null) {
@@ -218,18 +219,115 @@ public class AppointmentService {
         appointment.setUpcoming(false);
         return appointmentRepository.save(appointment);
     }
-    
-    /**
-     * Cancel (delete) an appointment
+      /**
+     * Cancel (delete) an appointment and restore the time slot to the doctor's availability
      */
-    public void deleteAppointment(String id) {
-        appointmentRepository.deleteById(id);
-    }
+public void deleteAppointment(String id) {
+    // Get the appointment before deleting it
+    Appointment appointmentToDelete = appointmentRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + id));
     
+    // Restore the time slot to the doctor's availability before deleting
+    restoreTimeSlotToDoctor(appointmentToDelete);
+    
+    // Delete the appointment
+    appointmentRepository.deleteById(id);
+}
+
+private void restoreTimeSlotToDoctor(Appointment appointment) {
+    try {
+        // Get the doctor ID from the appointment
+        String doctorId = appointment.getDoctor().getId();
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
+        
+        // Get the day of the week from the appointment date
+        LocalDate appointmentDate = LocalDate.parse(appointment.getDate());
+        String dayName = appointmentDate.getDayOfWeek().toString().substring(0, 3).toLowerCase();
+          // Get the start and end times
+        String appointmentHour = appointment.getHour();
+        String startTimeStr;
+        
+        // Check if appointmentHour is a LocalTime or a String
+        if (appointmentHour instanceof String) {
+            // Format might be "08:00 AM" or "08:00"
+            startTimeStr = convertToStandardTimeFormat(appointmentHour);
+        } else {
+            // Handle case where appointmentHour is a LocalTime
+            startTimeStr = appointmentHour;
+        }
+        
+        // Calculate end time (assuming 30-minute appointments)
+        LocalTime startTime = LocalTime.parse(startTimeStr);
+        LocalTime endTime = startTime.plusMinutes(30);
+        String endTimeStr = endTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+          // Get the doctor's availability for that day
+        Map<String, List<Doctor.TimeSlot>> availability = doctor.getAvailableTimeSlots();
+        if (availability == null) {
+            availability = new HashMap<>();
+            doctor.setAvailableTimeSlots(availability);
+        }
+        
+        // Get or create time slots for the day
+        List<Doctor.TimeSlot> timeSlots = availability.get(dayName);
+        if (timeSlots == null) {
+            timeSlots = new ArrayList<>();
+            availability.put(dayName, timeSlots);
+        }
+        
+        // Check if this time slot already exists
+        boolean timeSlotExists = false;
+        for (Doctor.TimeSlot slot : timeSlots) {
+            if (slot.getStartTime().equals(startTimeStr)) {
+                timeSlotExists = true;
+                break;
+            }
+        }
+        
+        // Add the time slot back if it doesn't exist
+        if (!timeSlotExists) {
+            Doctor.TimeSlot newSlot = new Doctor.TimeSlot(startTimeStr, endTimeStr);
+            timeSlots.add(newSlot);
+            
+            // Sort the time slots by start time for consistency
+            timeSlots.sort((slot1, slot2) -> {
+                LocalTime time1 = LocalTime.parse(slot1.getStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
+                LocalTime time2 = LocalTime.parse(slot2.getStartTime(), DateTimeFormatter.ofPattern("HH:mm"));
+                return time1.compareTo(time2);
+            });
+            
+            // Save the updated doctor availability
+            doctorRepository.save(doctor);
+            System.out.println("Restored time slot " + startTimeStr + " to doctor's availability on " + dayName);
+        }
+    } catch (Exception e) {
+        System.err.println("Error restoring time slot: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
+/**
+ * Converts a time string to standard "HH:mm" 24-hour format.
+ */
+private String convertToStandardTimeFormat(String timeStr) {
+    try {
+        // Try parsing as "HH:mm"
+        LocalTime time = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
+        return time.format(DateTimeFormatter.ofPattern("HH:mm"));
+    } catch (Exception e) {
+        // Try parsing as "hh:mm a" (e.g., "08:00 AM")
+        try {
+            LocalTime time = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("hh:mm a"));
+            return time.format(DateTimeFormatter.ofPattern("HH:mm"));
+        } catch (Exception ex) {
+            throw new RuntimeException("Invalid time format: " + timeStr);
+        }
+    }
+}
     /**
      * Validate if the patient and doctor in the appointment exist
      */
     private void validatePatientAndDoctor(Appointment appointment) {
+```
         if (appointment.getPatient() != null && appointment.getPatient().getId() != null) {
             Patient patient = patientRepository.findById(appointment.getPatient().getId())
                 .orElseThrow(() -> new RuntimeException("Patient not found with id: " + appointment.getPatient().getId()));
@@ -407,4 +505,48 @@ public class AppointmentService {
         }
     }
     
+    /**
+     * Get the currently ongoing appointment for a doctor
+     * An ongoing appointment is one that's happening today and its time slot includes the current time
+     */
+    public Appointment getCurrentOngoingAppointmentForDoctor(String doctorId) {
+        // Get current date and time
+        LocalDate currentDate = LocalDate.now();
+        LocalTime currentTime = LocalTime.now();
+        
+        // Find all appointments for today for this doctor
+        List<Appointment> todaysAppointments = appointmentRepository.findByDoctorIdAndDate(doctorId, currentDate);
+        
+        // Find the appointment that is currently ongoing
+        // An appointment is ongoing if the current time is between the start time and end time (assuming appointments are 30 minutes)
+        for (Appointment appointment : todaysAppointments) {
+            LocalTime appointmentStartTime = appointment.getHour();
+            // Calculate end time (30 minutes after start)
+            LocalTime appointmentEndTime = appointmentStartTime.plusMinutes(30);
+            
+            // Check if current time is within the appointment time slot
+            if (currentTime.isAfter(appointmentStartTime) && currentTime.isBefore(appointmentEndTime)) {
+                return appointment;
+            }
+        }
+        
+        // No ongoing appointment was found
+        return null;
+    }
+
+    /**
+     * Get appointments for today for a doctor, ordered by time
+     */
+    public List<Appointment> getTodaysAppointmentsForDoctor(String doctorId) {
+        // Get current date
+        LocalDate currentDate = LocalDate.now();
+        
+        // Find all appointments for today for this doctor
+        List<Appointment> todaysAppointments = appointmentRepository.findByDoctorIdAndDate(doctorId, currentDate);
+        
+        // Sort by time
+        todaysAppointments.sort((a1, a2) -> a1.getHour().compareTo(a2.getHour()));
+        
+        return todaysAppointments;
+    }
 }

@@ -15,12 +15,13 @@ export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
-}>) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>
+}>) {  return (
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} h-full`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {children}
+          <div className="h-full">
+            {children}
+          </div>
         </ThemeProvider>
       </body>
     </html>

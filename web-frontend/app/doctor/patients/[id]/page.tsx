@@ -11,12 +11,14 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useParams } from "next/navigation"
-import { adminApi } from '@/lib/api';
-import { Patient } from "@/lib/types";
+import { adminApi, doctorApi } from '@/lib/api';
+import { Appointment, Patient } from "@/lib/types";
 
 export default function PatientDetailsPage() {
   const { id } = useParams();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [pastAppointments, setPastAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editedPatient, setEditedPatient] = useState({
     id: id,
@@ -58,41 +60,49 @@ export default function PatientDetailsPage() {
   const [editedAllergies, setEditedAllergies] = useState(patient?.allergies || []);
   const [editedSurgeries, setEditedSurgeries] = useState<{ name: string }[]>([]);
   const [editedChronicConditions, setEditedChronicConditions] = useState(patient?.chronicConditions || []);
-
   useEffect(() => {
-    const fetchPatient = async () => {
+    const fetchPatientData = async () => {
+      setLoading(true);
       try {
         if (typeof id === "string") {
-          const response = await adminApi.getPatientById(id);
-          setPatient(response);
+          // Fetch patient details
+          const patientResponse = await adminApi.getPatientById(id);
+          setPatient(patientResponse);
           setEditedPatient((prev) => ({
             ...prev,
-            id: response.id,
-            firstName: response.firstName || '',
-            lastName: response.lastName || '',
-            name: response.name || '',
-            age: response.age?.toString() || '',
-            gender: response.gender || '',
-            email: response.email || '',
-            phone: response.phone || '',
-            height: response.height?.toString() || '',
-            weight: response.weight?.toString() || '',
-            location: response.location || '',
-            maritalStatus: response.maritalStatus || '',
-            occupation: response.occupation || '',
-            pets: response.hasPets ? 'Yes' : 'No',
-            smoking: response.isSmoking ? 'Yes' : 'No',
-            address: response.address || '',
-            insuranceProvider: response.insuranceProvider || '',
-            bloodType: response.bloodType || '',
+            id: patientResponse.id,
+            firstName: patientResponse.firstName || '',
+            lastName: patientResponse.lastName || '',
+            name: patientResponse.name || '',
+            age: patientResponse.age?.toString() || '',
+            gender: patientResponse.gender || '',
+            email: patientResponse.email || '',
+            phone: patientResponse.phone || '',
+            height: patientResponse.height?.toString() || '',
+            weight: patientResponse.weight?.toString() || '',
+            location: patientResponse.location || '',
+            maritalStatus: patientResponse.maritalStatus || '',
+            occupation: patientResponse.occupation || '',
+            pets: patientResponse.hasPets ? 'Yes' : 'No',
+            smoking: patientResponse.isSmoking ? 'Yes' : 'No',
+            address: patientResponse.address || '',
+            insuranceProvider: patientResponse.insuranceProvider || '',
+            bloodType: patientResponse.bloodType || '',
           }));
+
+          // Fetch past appointments
+          const appointmentsResponse = await doctorApi.getPastAppointmentsByPatientId(id);
+          setPastAppointments(appointmentsResponse);
         }
       } catch (error) {
-        console.error("Error fetching patient details:", error);
+        console.error("Error fetching patient data:", error);
+        toast.error("Failed to load patient data");
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchPatient();
+    fetchPatientData();
   }, [id]);
 
   // Validate the patient form
@@ -334,11 +344,6 @@ export default function PatientDetailsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Patient Details</h1>
           <p className="text-muted-foreground">View and manage patient information.</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/doctor/patients">
-            <Button variant="outline">Back to Patients</Button>
-          </Link>
-        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_3fr]">
@@ -579,20 +584,56 @@ export default function PatientDetailsPage() {
                   <CardTitle>Past Appointments</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-4">
-                    <li>
-                      <h4 className="font-semibold">Diagnosis: Common Cold</h4>
-                      <p>Plan: Rest, hydration, and over-the-counter medication.</p>
-                      <p>Resources: <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" className="text-blue-500">YouTube Link</a></p>
-                      <p>Prescriptions: Paracetamol 500mg</p>
-                    </li>
-                    <li>
-                      <h4 className="font-semibold">Diagnosis: Hypertension</h4>
-                      <p>Plan: Regular exercise, low-sodium diet, and medication.</p>
-                      <p>Resources: <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" className="text-blue-500">YouTube Link</a></p>
-                      <p>Prescriptions: Amlodipine 5mg</p>
-                    </li>
-                  </ul>
+                  {loading ? (
+                    <p className="text-muted-foreground italic">Loading past appointments...</p>
+                  ) : pastAppointments && pastAppointments.length > 0 ? (
+                    <ul className="space-y-8">
+                      {pastAppointments.map((appointment) => (
+                        <li key={appointment.id} className="border-b pb-6 last:border-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex flex-col">
+                              <h4 className="font-semibold text-lg">{new Date(appointment.date).toLocaleDateString('en-US', { 
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}</h4>
+                              <p className="text-sm text-muted-foreground">Time: {appointment.hour}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">Dr. {appointment.doctor?.name || "Unknown"}</p>
+                            </div>
+                          </div>
+                          
+                          {appointment.diagnosis && (
+                            <div className="mt-3">
+                              <h5 className="font-semibold">Diagnosis:</h5>
+                              <p className="text-muted-foreground">{appointment.diagnosis}</p>
+                            </div>
+                          )}
+                            {appointment.plan && (
+                            <div className="mt-3">
+                              <h5 className="font-semibold">Treatment Plan:</h5>
+                              <p className="text-muted-foreground">{appointment.plan}</p>
+                            </div>
+                          )}
+                            {(typeof appointment.prescription !== 'undefined' || 
+                            typeof appointment.prescriptions !== 'undefined') && (
+                            <div className="mt-3">
+                              <h5 className="font-semibold">Prescriptions:</h5>
+                              <p className="text-muted-foreground">
+                                {typeof appointment.prescription !== 'undefined' 
+                                  ? appointment.prescription 
+                                  : appointment.prescriptions}
+                              </p>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground italic">No past appointments found for this patient.</p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

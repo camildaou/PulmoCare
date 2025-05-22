@@ -21,14 +21,12 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     const user = JSON.parse(userInfo)
     if (user.type !== "doctor") {
       router.push("/")
-    }
-  }, [router])
-
+    }  }, [router])
+  
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen h-full">
       <Sidebar />
-      <div className="flex-1 p-8 pt-6 overflow-auto">
-
+      <div className="flex-1 p-8 pt-6 overflow-auto ml-[240px]">
         <main>{children}</main>
       </div>
     </div>

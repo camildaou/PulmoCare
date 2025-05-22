@@ -47,9 +47,8 @@ export function Sidebar() {
     // In a real app, you would clear authentication tokens/cookies here
     router.push("/")
   }
-
   return (
-    <div className="flex h-screen w-[240px] flex-col border-r bg-secondary text-secondary-foreground">
+    <div className="fixed h-screen w-[240px] flex flex-col border-r bg-secondary text-secondary-foreground">
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/admin" className="flex items-center gap-2 font-semibold">
           <Stethoscope className="h-6 w-6" />

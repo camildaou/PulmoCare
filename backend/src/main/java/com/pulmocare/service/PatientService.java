@@ -56,10 +56,6 @@ public class PatientService {
         patient.setSmoking(patientDetails.isSmoking());
         
         // Update medical history
-        patient.setPreviousDiagnosis(patientDetails.getPreviousDiagnosis());
-        patient.setPreviousPlans(patientDetails.getPreviousPlans());
-        patient.setPreviousPrescriptions(patientDetails.getPreviousPrescriptions());
-        patient.setPreviousResources(patientDetails.getPreviousResources());
         patient.setSymptomsAssessment(patientDetails.getSymptomsAssessment());
         patient.setReport(patientDetails.getReport());
         

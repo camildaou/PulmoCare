@@ -1,5 +1,6 @@
 export interface Doctor {
   id: string;
+  name: string; // Full name for display purposes
   firstName: string;
   lastName: string;
   description?: string;
@@ -62,5 +63,14 @@ export interface Appointment {
     name: string;
   };
   patient: Patient; // Updated to use the Patient interface
+  
+  // Medical documentation
+  diagnosis?: string; // Diagnosis provided by the doctor
+  prescriptions?: string; // Medications prescribed to the patient (plural form)
+  prescription?: string; // Alternative field name for prescriptions (singular form)
+  plan?: string; // Treatment plan
+  confidentialNotes?: string; // Doctor's personal/confidential notes
+  reportPending?: boolean; // Whether a report is pending for this appointment
+  location?: string; // Appointment location
 }
 

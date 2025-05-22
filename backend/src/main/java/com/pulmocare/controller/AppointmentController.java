@@ -251,25 +251,22 @@ public class AppointmentController {
                 appointment.getDoctor().getId(), 
                 appointment.getDate(), 
                 appointment.getHour().toString() // Convert LocalTime to String
-            );
-
-            // Log the result of the validation
+            );            // Log the result of the validation
             System.out.println("Time slot availability: " + isAvailable);
 
             if (!isAvailable) {
                 System.out.println("Time slot not available for Doctor ID: " + appointment.getDoctor().getId());
-                return new ResponseEntity<>("The selected time slot is not available.", HttpStatus.BAD_REQUEST);
+                // Return 200 OK with a specific message that the frontend can interpret
+                return new ResponseEntity<>("TIME_SLOT_UNAVAILABLE", HttpStatus.OK);
             }
 
             // Log the default value assignment step
-            System.out.println("Setting default values for optional fields.");
-
-            // Set additional fields to null if not provided
+            System.out.println("Setting default values for optional fields.");            // Set additional fields to null if not provided
             appointment.setLocation(null);
             appointment.setDiagnosis(null);
             appointment.setPersonalNotes(null);
             appointment.setPlan(null);
-            appointment.setAssessmentInfo(null);
+            appointment.setPrescription(null);
             appointment.setReportPending(false);
             appointment.setUpcoming(true);
             appointment.setVaccine(false);
@@ -286,6 +283,39 @@ public class AppointmentController {
 
             // Include detailed error message in the response
             return new ResponseEntity<>("An error occurred while creating the appointment: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Get the currently ongoing appointment for a doctor
+     */
+    @GetMapping("/doctor/{doctorId}/ongoing")
+    public ResponseEntity<Appointment> getCurrentOngoingAppointmentForDoctor(@PathVariable String doctorId) {
+        try {
+            Appointment ongoingAppointment = appointmentService.getCurrentOngoingAppointmentForDoctor(doctorId);
+            if (ongoingAppointment == null) {
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT); // No ongoing appointment
+            }
+            return new ResponseEntity<>(ongoingAppointment, HttpStatus.OK);
+        } catch (Exception e) {
+            System.err.println("Error getting ongoing appointment: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    /**
+     * Get today's appointments for a doctor
+     */
+    @GetMapping("/doctor/{doctorId}/today")
+    public ResponseEntity<List<Appointment>> getTodaysAppointmentsForDoctor(@PathVariable String doctorId) {
+        try {
+            List<Appointment> todaysAppointments = appointmentService.getTodaysAppointmentsForDoctor(doctorId);
+            return new ResponseEntity<>(todaysAppointments, HttpStatus.OK);
+        } catch (Exception e) {
+            System.err.println("Error getting today's appointments: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
