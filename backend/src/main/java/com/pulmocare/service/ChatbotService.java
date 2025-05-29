@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ChatbotService {
 
-    @Value("${gemini.api.key}")
+    @Value("AIzaSyBAEzmP1W55WcyxliiQTAq5F4bHdT-MiqU")
     private String apiKey;
 
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";

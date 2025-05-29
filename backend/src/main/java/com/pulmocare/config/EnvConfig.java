@@ -2,7 +2,7 @@ package com.pulmocare.config;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.context.annotation.Bean;
-// import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
@@ -10,10 +10,10 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-// @Configuration - disabled temporarily
+@Configuration
 public class EnvConfig {
 
-    // @Bean - disabled temporarily
+    @Bean
     public Dotenv dotenv(ConfigurableEnvironment environment) {
         // Load .env file from backend directory
         Dotenv dotenv = Dotenv.configure()

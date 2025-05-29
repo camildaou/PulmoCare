@@ -191,27 +191,26 @@ private fun PatientProfileContent(patient: Patient) {
             viewModel.resetUpdateState()
         }
     }
-      Row(
+    
+    Row(
         modifier = Modifier.fillMaxWidth()
     ) {
         // Profile picture card
         Card(
             modifier = Modifier.weight(1f),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            shape = MaterialTheme.shapes.medium
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
-            ) {                Text(
+            ) {
+                Text(
                     text = "Profile Picture",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.titleMedium
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -223,13 +222,12 @@ private fun PatientProfileContent(patient: Patient) {
                     if (patient.photo != null) {
                         // Convert base64 string to bitmap and display
                         val bitmap = base64ToBitmap(patient.photo)
-                        if (bitmap != null) {                            androidx.compose.foundation.Image(
+                        if (bitmap != null) {
+                            androidx.compose.foundation.Image(
                                 bitmap = bitmap.asImageBitmap(),
                                 contentDescription = "Profile Picture",
                                 modifier = Modifier
                                     .size(120.dp)
-                                    .clip(CircleShape)
-                                    .padding(4.dp)
                                     .clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
@@ -257,16 +255,16 @@ private fun PatientProfileContent(patient: Patient) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))                Text(
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
                     text = "${patient.firstName} ${patient.lastName}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.headlineSmall
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth(0.8f)
+                    onClick = { imagePickerLauncher.launch("image/*") }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -301,32 +299,32 @@ private fun PatientProfileContent(patient: Patient) {
             }
         }
 
-        Spacer(modifier = Modifier.width(16.dp))        // Profile info card
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Profile info card
         Card(
             modifier = Modifier.weight(1f),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            shape = MaterialTheme.shapes.medium
+            )
         ) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth()
-            ) {                Text(
+            ) {
+                Text(
                     text = "Personal Info",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.titleMedium
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Contact Information                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Contact Information
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Email,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        contentDescription = null
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -335,11 +333,12 @@ private fun PatientProfileContent(patient: Patient) {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Cake,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        contentDescription = null
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
