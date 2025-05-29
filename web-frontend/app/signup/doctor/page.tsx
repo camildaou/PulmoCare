@@ -218,8 +218,18 @@ export default function DoctorSignUpPage() {
         
         const data = await response.json();
         console.log("Registration successful:", data);
-        
         toast.success("Account created successfully!")
+
+        // Store doctor info in localStorage for immediate use
+        localStorage.setItem(
+          "pulmocare_user",
+          JSON.stringify({
+            id: data.id,
+            email: data.email,
+            name: `${data.firstName} ${data.lastName}`,
+            type: "doctor",
+          })
+        );
 
         // Redirect to doctors page
         router.push("/doctor")
