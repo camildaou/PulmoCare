@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -84,19 +85,20 @@ fun DashboardScreen(
     LaunchedEffect(patientState) {
         isLoading = patientState is PatientProfileViewModel.PatientState.Loading || patientState is PatientProfileViewModel.PatientState.Initial
     }
-
-        Scaffold(
+    Scaffold(
         topBar = {
             TopAppBar(
                 title = {                    
                     Column(
-                        modifier = Modifier.padding(start = 8.dp) // Add padding to push text to the right a bit
+                        modifier = Modifier
+                            .padding(start = 8.dp, top = 8.dp, bottom = 8.dp) // Added vertical padding
+                            .fillMaxWidth(0.85f) // Limit width to make room for the notification icon
                     ) {                          
                         if (isLoading) {
                             // Show loading animation while user is being fetched
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
+                                    modifier = Modifier.size(20.dp),
                                     color = MaterialTheme.colorScheme.primary,
                                     strokeWidth = 2.dp,
                                     strokeCap = StrokeCap.Round
@@ -104,7 +106,7 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Loading user data...",
-                                    style = MaterialTheme.typography.titleLarge
+                                    style = MaterialTheme.typography.titleMedium
                                 )
                             }
                         } else {
@@ -113,42 +115,47 @@ fun DashboardScreen(
                                 else -> null
                             }
                             Text(
-                                text = "Welcome To PulmoCare, $name!",
-                                style = MaterialTheme.typography.headlineMedium.copy(
+                                text = "Welcome to PulmoCare, $name!",
+                                style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp,
                                     color = MedicalBlue
-                                )
+                                ),
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Manage your respiratory health",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = LightMutedText
                             )
                         }
-                        Text(
-                            text = "Manage your respiratory health",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = LightMutedText
-                        )
                     }                
                 },
                 actions = {
                     // Adjust notification bell icon to make it clearer
                     Box(
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = 16.dp, top = 8.dp)
                     ) {
                         BadgedBox(
                             badge = {
-                                Badge { Text("3") }
+                                Badge(
+                                    modifier = Modifier.offset(x = (-4).dp, y = 8.dp)
+                                ) { 
+                                    Text("3") 
+                                }
                             }
                         ) {
                             IconButton(
                                 onClick = { showNotifications = !showNotifications },
                                 modifier = Modifier
-                                    .size(48.dp)  // Increased size for better visibility
+                                    .size(44.dp)
                                     .padding(4.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Notifications",
-                                    modifier = Modifier.size(28.dp),  // Larger icon
-                                    tint = MedicalBlue  // Use the brand color
+                                    modifier = Modifier.size(26.dp),
+                                    tint = MedicalBlue
                                 )
                             }
                         }
@@ -160,10 +167,10 @@ fun DashboardScreen(
                     ) {
                         // Dropdown menu content stays the same
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
+                },                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
-                )
+                ),
+                modifier = Modifier.height(64.dp) // Set a fixed height to ensure enough space
             )
         }
     ) { paddingValues ->
@@ -179,41 +186,46 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                FeatureCard(
-                    title = "Appointments",
-                    description = "View and manage your scheduled appointments",
-                    icon = Icons.Default.CalendarMonth,
+                // First column
+                Column(
                     modifier = Modifier.weight(1f),
-                    onClick = onNavigateToAppointments
-                )
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    FeatureCard(
+                        title = "Appointments",
+                        description = "View and manage your scheduled appointments",
+                        icon = Icons.Default.CalendarMonth,
+                        onClick = onNavigateToAppointments
+                    )
+                    
+                    FeatureCard(
+                        title = "Consult Doctors",
+                        description = "Find and connect with pulmonary specialists",
+                        icon = Icons.Default.People,
+                        onClick = onNavigateToDoctors
+                    )
+                }
 
-                FeatureCard(
-                    title = "Medical Info",
-                    description = "Access your medical records and documents",
-                    icon = Icons.Default.Description,
+                // Second column
+                Column(
                     modifier = Modifier.weight(1f),
-                    onClick = onNavigateToMedicalInfo
-                )
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    FeatureCard(
+                        title = "Medical Info",
+                        description = "Access your medical records and documents",
+                        icon = Icons.Default.Description,
+                        onClick = onNavigateToMedicalInfo
+                    )
+                    
+                    FeatureCard(
+                        title = "Medical Reports",
+                        description = "Upload and analyze blood tests and medical reports",
+                        icon = Icons.Default.Description,
+                        onClick = onNavigateToMedicalReports
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            FeatureCard(
-                title = "Consult Doctors",
-                description = "Find and connect with pulmonary specialists",
-                icon = Icons.Default.People,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onNavigateToDoctors
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            FeatureCard(
-                title = "Medical Reports",
-                description = "Upload and analyze blood tests and medical reports",
-                icon = Icons.Default.Description,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onNavigateToMedicalReports
-            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -325,7 +337,7 @@ fun FeatureCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(MedicalBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
@@ -334,11 +346,11 @@ fun FeatureCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MedicalBlue,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = title,
@@ -350,7 +362,8 @@ fun FeatureCard(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = LightMutedText
+                color = LightMutedText,
+                maxLines = 2
             )
         }
     }

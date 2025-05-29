@@ -29,6 +29,7 @@ data class Appointment(
     val diagnosis: String? = null,
     val personalNotes: String? = null, // doctor's notes
     val plan: String? = null,
+    val prescription: String? = null, // medications prescribed to the patient
     
     // Appointment details
     val location: String = "",

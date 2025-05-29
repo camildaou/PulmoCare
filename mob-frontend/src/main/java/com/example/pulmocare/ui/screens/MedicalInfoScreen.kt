@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
@@ -61,41 +62,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicalInfoScreen(
-    onNavigateToMedicalReports: () -> Unit = {}
+    onNavigateToMedicalReports: () -> Unit = {},
+    onNavigateToXrayAnalysis: () -> Unit = {}
 ) {
-    val xrayViewModel: XrayViewModel = viewModel()
-    val context = LocalContext.current
-    
-    // X-ray state
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    
-    // ViewModel state
-    val isLoading by xrayViewModel.isLoading.collectAsState()
-    val classification by xrayViewModel.classificationResult.collectAsState()
-//    val assessment by xrayViewModel.assessmentResult.collectAsState()
-    val error by xrayViewModel.error.collectAsState()
-    
-    // Image picker
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            selectedImageUri = it
-            xrayViewModel.classifyXray(context, it)
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text(
-                            text = "X-ray Analysis",
+                            text = "Medical Information",
                             style = MaterialTheme.typography.titleLarge
                         )
                         Text(
-                            text = "Upload and analyze X-ray images",
+                            text = "Access and analyze your medical data",
                             style = MaterialTheme.typography.bodyMedium,
                             color = LightMutedText
                         )
@@ -112,387 +92,459 @@ fun MedicalInfoScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // X-ray Classification Card
+            // X-ray Analysis Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clickable { onNavigateToXrayAnalysis() },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header
+                    Column {
+                        Text(
+                            text = "X-ray Analysis",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MedicalBlue
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Upload and analyze your chest X-rays with AI technology",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LightMutedText
+                        )
+                    }
+                    
+                    // Bottom section with icon and button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(MedicalBlue.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                modifier = Modifier.size(30.dp),
+                                tint = MedicalBlue
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { onNavigateToXrayAnalysis() }
+                        ) {
+                            Text("Analyze X-rays")
+                        }
+                    }
+                }
+            }
+            
+            // Medical Reports Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clickable { onNavigateToMedicalReports() },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header
+                    Column {
+                        Text(
+                            text = "Medical Reports",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MedicalBlue
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Upload and analyze your blood tests and laboratory reports",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LightMutedText
+                        )
+                    }
+                    
+                    // Bottom section with icon and button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(MedicalBlue.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(30.dp),
+                                tint = MedicalBlue
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { onNavigateToMedicalReports() }
+                        ) {
+                            Text("View Reports")
+                        }
+                    }
+                }
+            }
+            
+            // Information card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = LightMuted
                 )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "X-ray Analysis",
-                        style = MaterialTheme.typography.titleMedium
+                        text = "Why analyze your medical data?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     Text(
-                        text = "Upload an X-ray image for AI-powered analysis",
+                        text = "Regular monitoring of your respiratory health helps in early detection of complications and allows for timely intervention.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = LightMutedText
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // X-ray Upload Section
-                    if (selectedImageUri == null && !isLoading && classification == null) {
-                        XrayUploadSection(
-                            onUploadClick = { imagePickerLauncher.launch("image/*") }
-                        )
-                    } else if (isLoading) {
-                        XrayLoadingSection()
-                    } else if (error != null) {
-                        XrayErrorSection(
-                            error = error ?: "An unknown error occurred",
-                            onRetryClick = { selectedImageUri?.let { xrayViewModel.classifyXray(context, it) } },
-                            onNewImageClick = {
-                                selectedImageUri = null
-                                xrayViewModel.resetState()
-                            }
-                        )
-                   } else if (classification != null) {
-                        XrayResultSection(
-                            imageUri = selectedImageUri,
-                            classification = classification?.classification ?: "Unknown",
-//                            assessment = assessment?.text ?: "Loading assessment...",
-//                            isAssessmentLoading = assessment == null && error == null,
-                            onNewXrayClick = {
-                                selectedImageUri = null
-                                xrayViewModel.resetState()
-                                imagePickerLauncher.launch("image/*")
-                            }
-                        )                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Disclaimer: AI analysis is not a substitute for professional medical diagnosis. Always consult with your healthcare provider.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MedicalRed
+                    )
                 }
             }
-            
-//            // Add a card for Medical Reports
+        }
+    }
+}
+
+
+//@Composable
+//fun XrayUploadSection(onUploadClick: () -> Unit) {
+//    Box(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .height(200.dp)
+//            .border(
+//                width = 1.dp,
+//                color = LightMuted,
+//                shape = RoundedCornerShape(8.dp)
+//            )
+//            .clip(RoundedCornerShape(8.dp))
+//            .background(Color(0xFFF8F9FA))
+//            .clickable { onUploadClick() },
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Column(
+//            horizontalAlignment = Alignment.CenterHorizontally,
+//            verticalArrangement = Arrangement.Center
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.CloudUpload,
+//                contentDescription = "Upload X-ray",
+//                modifier = Modifier.size(48.dp),
+//                tint = MedicalBlue
+//            )
+//
+//            Spacer(modifier = Modifier.height(8.dp))
+//
+//            Text(
+//                text = "Upload X-ray Image",
+//                style = MaterialTheme.typography.titleSmall,
+//                color = MaterialTheme.colorScheme.onSurface
+//            )
+//
+//            Spacer(modifier = Modifier.height(4.dp))
+//
+//            Text(
+//                text = "Click to select a file from your device",
+//                style = MaterialTheme.typography.bodySmall,
+//                color = LightMutedText
+//            )
+//        }
+//    }
+//}
+//
+//@Composable
+//fun XrayLoadingSection() {
+//    Box(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .height(200.dp)
+//            .border(
+//                width = 1.dp,
+//                color = LightMuted,
+//                shape = RoundedCornerShape(8.dp)
+//            )
+//            .clip(RoundedCornerShape(8.dp))
+//            .background(Color(0xFFF8F9FA)),
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Column(
+//            horizontalAlignment = Alignment.CenterHorizontally,
+//            verticalArrangement = Arrangement.Center
+//        ) {
+//            CircularProgressIndicator(
+//                color = MedicalBlue,
+//                modifier = Modifier.size(48.dp)
+//            )
+//
 //            Spacer(modifier = Modifier.height(16.dp))
 //
-//            Card(
-//                modifier = Modifier.fillMaxWidth(),
-//                colors = CardDefaults.cardColors(
-//                    containerColor = MaterialTheme.colorScheme.surface
-//                )
-//            ) {
-//                Column(
-//                    modifier = Modifier.padding(16.dp)
-//                ) {
-//                    Text(
-//                        text = "Medical Test Reports",
-//                        style = MaterialTheme.typography.titleMedium
-//                    )
-//                    Text(
-//                        text = "Upload and analyze blood tests and other medical reports",
-//                        style = MaterialTheme.typography.bodyMedium,
-//                        color = LightMutedText
-//                    )
-//
-//                    Spacer(modifier = Modifier.height(16.dp))
-//
-//                    Button(
-//                        onClick = onNavigateToMedicalReports,
-//                        modifier = Modifier.fillMaxWidth()
-//                    ) {
-//                        Icon(
-//                            imageVector = Icons.Default.Description,
-//                            contentDescription = "View Medical Reports",
-//                            modifier = Modifier.size(16.dp)
-//                        )
-//                        Spacer(modifier = Modifier.size(8.dp))
-//                        Text("View Medical Reports")
-//                    }
-//                }
-//            }
-        }
-    }
-}
-
-@Composable
-fun XrayUploadSection(onUploadClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .border(
-                width = 1.dp,
-                color = LightMuted,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF8F9FA))
-            .clickable { onUploadClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CloudUpload,
-                contentDescription = "Upload X-ray",
-                modifier = Modifier.size(48.dp),
-                tint = MedicalBlue
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Upload X-ray Image",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(
-                text = "Click to select a file from your device",
-                style = MaterialTheme.typography.bodySmall,
-                color = LightMutedText
-            )
-        }
-    }
-}
-
-@Composable
-fun XrayLoadingSection() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .border(
-                width = 1.dp,
-                color = LightMuted,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF8F9FA)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            CircularProgressIndicator(
-                color = MedicalBlue,
-                modifier = Modifier.size(48.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "Analyzing X-ray...",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(
-                text = "This may take a few moments",
-                style = MaterialTheme.typography.bodySmall,
-                color = LightMutedText
-            )
-        }
-    }
-}
-
-@Composable
-fun XrayErrorSection(
-    error: String,
-    onRetryClick: () -> Unit,
-    onNewImageClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.Error,
-            contentDescription = "Error",
-            tint = MedicalRed,
-            modifier = Modifier.size(48.dp)
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "Error Processing X-ray",
-            style = MaterialTheme.typography.titleMedium,
-            color = MedicalRed
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onRetryClick,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Retry",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.size(4.dp))
-                Text("Retry")
-            }
-            
-            Button(
-                onClick = onNewImageClick,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Image,
-                    contentDescription = "New Image",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.size(4.dp))
-                Text("New Image")
-            }
-        }
-    }
-}
-
-@Composable
-fun XrayResultSection(
-    imageUri: Uri?,
-    classification: String,
-////    assessment: String,
-//    isAssessmentLoading: Boolean,
-    onNewXrayClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // X-ray image
-        imageUri?.let { uri ->
-            AsyncImage(
-                model = uri,
-                contentDescription = "X-ray Image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Classification result
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Classification:",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
-            )
-            
-            Spacer(modifier = Modifier.size(8.dp))
-            
-            Text(
-                text = classification,
-                style = MaterialTheme.typography.titleSmall,
-                color = when(classification) {
-                    "Normal" -> Color(0xFF28A745)
-                    "Covid-19" -> MedicalRed
-                    "Bacterial Pneumonia" -> Color(0xFFE67E22)
-                    else -> MaterialTheme.colorScheme.onSurface
-                },
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Classified",
-                tint = Color(0xFF28A745),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-//        // AI Assessment Section
-//        Card(
-//            modifier = Modifier.fillMaxWidth(),
-//            colors = CardDefaults.cardColors(
-//                containerColor = Color(0xFFF8F9FA)
+//            Text(
+//                text = "Analyzing X-ray...",
+//                style = MaterialTheme.typography.titleSmall,
+//                color = MaterialTheme.colorScheme.onSurface
 //            )
+//
+//            Spacer(modifier = Modifier.height(4.dp))
+//
+//            Text(
+//                text = "This may take a few moments",
+//                style = MaterialTheme.typography.bodySmall,
+//                color = LightMutedText
+//            )
+//        }
+//    }
+//}
+//
+//@Composable
+//fun XrayErrorSection(
+//    error: String,
+//    onRetryClick: () -> Unit,
+//    onNewImageClick: () -> Unit
+//) {
+//    Column(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp),
+//        horizontalAlignment = Alignment.CenterHorizontally
+//    ) {
+//        Icon(
+//            imageVector = Icons.Default.Error,
+//            contentDescription = "Error",
+//            tint = MedicalRed,
+//            modifier = Modifier.size(48.dp)
+//        )
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+//        Text(
+//            text = "Error Processing X-ray",
+//            style = MaterialTheme.typography.titleMedium,
+//            color = MedicalRed
+//        )
+//
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        Text(
+//            text = error,
+//            style = MaterialTheme.typography.bodyMedium,
+//            color = MaterialTheme.colorScheme.onSurface
+//        )
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.spacedBy(8.dp)
 //        ) {
-//            Column(
-//                modifier = Modifier.padding(16.dp)
+//            Button(
+//                onClick = onRetryClick,
+//                modifier = Modifier.weight(1f)
 //            ) {
-//                Row(
-//                    verticalAlignment = Alignment.CenterVertically
-//                ) {
-//                    Text(
-//                        text = "Gemini AI Assessment",
-//                        style = MaterialTheme.typography.titleSmall,
-//                        fontWeight = FontWeight.Medium
-//                    )
-//
-//                    if (isAssessmentLoading) {
-//                        Spacer(modifier = Modifier.size(8.dp))
-//                        CircularProgressIndicator(
-//                            modifier = Modifier.size(16.dp),
-//                            strokeWidth = 2.dp
-//                        )
-//                    }
-//                }
-//
-//                Spacer(modifier = Modifier.height(8.dp))
-//
-//                Text(
-//                    text = assessment,
-//                    style = MaterialTheme.typography.bodyMedium
+//                Icon(
+//                    imageVector = Icons.Default.Refresh,
+//                    contentDescription = "Retry",
+//                    modifier = Modifier.size(16.dp)
 //                )
+//                Spacer(modifier = Modifier.size(4.dp))
+//                Text("Retry")
+//            }
+//
+//            Button(
+//                onClick = onNewImageClick,
+//                modifier = Modifier.weight(1f)
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Image,
+//                    contentDescription = "New Image",
+//                    modifier = Modifier.size(16.dp)
+//                )
+//                Spacer(modifier = Modifier.size(4.dp))
+//                Text("New Image")
 //            }
 //        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Upload new X-ray button
-        Button(
-            onClick = onNewXrayClick,
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Icon(
-                imageVector = Icons.Default.CloudUpload,
-                contentDescription = "Upload new X-ray",
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.size(4.dp))
-            Text("Upload New X-ray")
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Medical disclaimer
-        Text(
-            text = "Disclaimer: This AI analysis is not a substitute for professional medical diagnosis. Please consult with a healthcare provider for proper diagnosis and treatment.",
-            style = MaterialTheme.typography.bodySmall,
-            color = LightMutedText
-        )
-    }
-}
+//    }
+//}
+//
+//@Composable
+//fun XrayResultSection(
+//    imageUri: Uri?,
+//    classification: String,
+//////    assessment: String,
+////    isAssessmentLoading: Boolean,
+//    onNewXrayClick: () -> Unit
+//) {
+//    Column(
+//        modifier = Modifier.fillMaxWidth()
+//    ) {
+//        // X-ray image
+//        imageUri?.let { uri ->
+//            AsyncImage(
+//                model = uri,
+//                contentDescription = "X-ray Image",
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .height(200.dp)
+//                    .clip(RoundedCornerShape(8.dp)),
+//                contentScale = ContentScale.Crop
+//            )
+//        }
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+//        // Classification result
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Text(
+//                text = "Classification:",
+//                style = MaterialTheme.typography.titleSmall,
+//                fontWeight = FontWeight.Medium
+//            )
+//
+//            Spacer(modifier = Modifier.size(8.dp))
+//
+//            Text(
+//                text = classification,
+//                style = MaterialTheme.typography.titleSmall,
+//                color = when(classification) {
+//                    "Normal" -> Color(0xFF28A745)
+//                    "Covid-19" -> MedicalRed
+//                    "Bacterial Pneumonia" -> Color(0xFFE67E22)
+//                    else -> MaterialTheme.colorScheme.onSurface
+//                },
+//                fontWeight = FontWeight.Bold
+//            )
+//
+//            Spacer(modifier = Modifier.weight(1f))
+//
+//            Icon(
+//                imageVector = Icons.Default.Check,
+//                contentDescription = "Classified",
+//                tint = Color(0xFF28A745),
+//                modifier = Modifier.size(20.dp)
+//            )
+//        }
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+////        // AI Assessment Section
+////        Card(
+////            modifier = Modifier.fillMaxWidth(),
+////            colors = CardDefaults.cardColors(
+////                containerColor = Color(0xFFF8F9FA)
+////            )
+////        ) {
+////            Column(
+////                modifier = Modifier.padding(16.dp)
+////            ) {
+////                Row(
+////                    verticalAlignment = Alignment.CenterVertically
+////                ) {
+////                    Text(
+////                        text = "Gemini AI Assessment",
+////                        style = MaterialTheme.typography.titleSmall,
+////                        fontWeight = FontWeight.Medium
+////                    )
+////
+////                    if (isAssessmentLoading) {
+////                        Spacer(modifier = Modifier.size(8.dp))
+////                        CircularProgressIndicator(
+////                            modifier = Modifier.size(16.dp),
+////                            strokeWidth = 2.dp
+////                        )
+////                    }
+////                }
+////
+////                Spacer(modifier = Modifier.height(8.dp))
+////
+////                Text(
+////                    text = assessment,
+////                    style = MaterialTheme.typography.bodyMedium
+////                )
+////            }
+////        }
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+//        // Upload new X-ray button
+//        Button(
+//            onClick = onNewXrayClick,
+//            modifier = Modifier.align(Alignment.End)
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.CloudUpload,
+//                contentDescription = "Upload new X-ray",
+//                modifier = Modifier.size(16.dp)
+//            )
+//            Spacer(modifier = Modifier.size(4.dp))
+//            Text("Upload New X-ray")
+//        }
+//
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        // Medical disclaimer
+//        Text(
+//            text = "Disclaimer: This AI analysis is not a substitute for professional medical diagnosis. Please consult with a healthcare provider for proper diagnosis and treatment.",
+//            style = MaterialTheme.typography.bodySmall,
+//            color = LightMutedText
+//        )
+//    }
+//}
 
 // Include existing composables here - MedicalCategoryItem, MedicalDocumentItem, etc.

@@ -1,7 +1,9 @@
 package com.example.pulmocare.data.repository
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import com.example.pulmocare.data.api.NetworkModule
@@ -56,7 +58,7 @@ class DoctorRepository(private val context: Context? = null) {
                             Doctor(
                                 id = backendDoctor.id ?: "",
                                 name = "Dr. ${backendDoctor.firstName.orEmpty().trim()} ${backendDoctor.lastName.orEmpty().trim()}",
-                                specialty = backendDoctor.specialization.orEmpty().ifEmpty { "General Physician" },
+                                specialty = backendDoctor.specialization.orEmpty().ifEmpty { "Pulmonologist" },
                                 rating = 4.8, // Default value or could be fetched from backend
                                 reviews = 100, // Default value or could be fetched from backend
                                 availability = backendDoctor.availableDays.map { day ->
@@ -104,11 +106,12 @@ class DoctorRepository(private val context: Context? = null) {
             return withContext(Dispatchers.IO) {
                 val response = doctorApiService.getDoctorById(id)
                 if (response.isSuccessful) {
-                    response.body()?.let { backendDoctor ->                        // Convert the backend doctor to our UI model
+                    response.body()?.let { backendDoctor -> 
+                                           // Convert the backend doctor to our UI model
                         Doctor(
                             id = backendDoctor.id ?: "",
                             name = "Dr. ${backendDoctor.firstName.orEmpty().trim()} ${backendDoctor.lastName.orEmpty().trim()}",
-                            specialty = backendDoctor.specialization.orEmpty().ifEmpty { "General Physician" },
+                            specialty = backendDoctor.specialization.orEmpty().ifEmpty { "Pulmonologist" },
                             rating = 4.8, // Default value or could be fetched from backend
                             reviews = 100, // Default value or could be fetched from backend
                             availability = backendDoctor.availableDays.map { day ->
@@ -363,6 +366,7 @@ fun getModelDoctors(): List<ModelDoctor> {
      * Get available time slots for a doctor on a specific date
      * This method fetches 30-minute time slots directly from the backend
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun getTimeSlotsByDoctorAndDay(doctorId: String, date: LocalDate): List<String> {
         _isLoading.value = true
         val result = mutableListOf<String>()
@@ -408,6 +412,7 @@ fun getModelDoctors(): List<ModelDoctor> {
      * Updates the time slots for a doctor after an appointment is booked
      * This ensures that the time slot is removed from the available slots
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun updateDoctorTimeSlotsAfterBooking(doctorId: String, date: LocalDate, bookedTimeSlot: String) {
         try {
             Log.d(TAG, "Updating doctor time slots after booking: $doctorId, $date, $bookedTimeSlot")

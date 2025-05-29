@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -31,6 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement.SpaceBetween
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Surface
 import coil.compose.AsyncImage
 import com.example.pulmocare.data.repository.AppointmentRepository
 import com.example.pulmocare.data.model.Doctor
@@ -39,6 +46,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.min
+import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.HealthAndSafety
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,14 +63,11 @@ fun AppointmentScreen() {
     val doctors = remember { doctorRepository.doctors }
     val isLoading = remember { doctorRepository.isLoading }
     val error = remember { doctorRepository.error }
-    
-    var showScheduleDialog by remember { mutableStateOf(false) }
+      var showScheduleDialog by remember { mutableStateOf(false) }
     var availableTimeSlots by remember { mutableStateOf<List<String>>(emptyList()) }
     var showCancelDialog by remember { mutableStateOf(false) }
     var appointmentToCancel by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(0) } // 0 for upcoming, 1 for past
-    
-    // For doctor selection and appointment scheduling
     var selectedDoctor by remember { mutableStateOf<com.example.pulmocare.data.model.Doctor?>(null) }
     var schedulingStep by remember { mutableStateOf(0) } // 0 = select doctor, 1 = select date/time, 2 = confirm
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -232,15 +239,15 @@ fun AppointmentScreen() {
                     } else {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(pastAppointments) { appointment -> 
+                        ) {                            items(pastAppointments) { appointment -> 
                                 AppointmentCard(
                                     doctorName = appointment.doctor?.getFullName() ?: "Unknown Doctor",
                                     specialty = appointment.doctor?.specialization ?: "",
                                     date = appointment.date,
                                     time = appointment.hour,
                                     location = appointment.location,
-                                    isPast = true
+                                    isPast = true,
+                                    appointment = appointment
                                 )
                             }
                         }
@@ -276,11 +283,11 @@ fun AppointmentScreen() {
             currentPage = currentTimeSlotsPage,
             onPageChanged = { currentTimeSlotsPage = it },
             timeSlotsPerPage = timeSlotsPerPage,
-            onDateSelected = { newDate ->
+            onDateSelected = { newDate -> 
                 selectedDate = newDate
                 // Fetch time slots directly from the backend when date changes
                 coroutineScope.launch {
-                    selectedDoctor?.id?.let { doctorId ->
+                    selectedDoctor?.id?.let { doctorId -> 
                         val slots = doctorRepository.getTimeSlotsByDoctorAndDay(doctorId, selectedDate)
                         availableTimeSlots = slots
                         currentTimeSlotsPage = 0 // Reset to first page when date changes
@@ -293,7 +300,7 @@ fun AppointmentScreen() {
             commonReasons = commonReasons,
             onScheduleAppointment = {
                 coroutineScope.launch {
-                    selectedDoctor?.let { doctor ->
+                    selectedDoctor?.let { doctor -> 
                         val formattedDate = selectedDate.format(DateTimeFormatter.ISO_DATE)
                         val startTime = selectedTime.split(" - ")[0].trim()
                         Log.d("AppointmentScreen", "Scheduling appointment:")
@@ -315,7 +322,7 @@ fun AppointmentScreen() {
                             reason = appointmentReason
                         )
                         
-                        result.onSuccess { appointment ->
+                        result.onSuccess { appointment -> 
                             // Show success message
                             Toast.makeText(context, "Appointment scheduled successfully!", Toast.LENGTH_SHORT).show()
                             
@@ -330,7 +337,7 @@ fun AppointmentScreen() {
                             // Reset and close dialog
                             showScheduleDialog = false
                             schedulingStep = 0
-                        }.onFailure { error ->
+                        }.onFailure { error -> 
                             // Show error message
                             Toast.makeText(context, "Failed to schedule: ${error.message}", Toast.LENGTH_LONG).show()
                             Log.e("AppointmentScreen", "Failed to schedule appointment", error)
@@ -361,10 +368,20 @@ fun AppointmentCard(
     appointment: com.example.pulmocare.data.model.Appointment? = null
 ) {
     val context = LocalContext.current
-      Card(
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
+            .padding(4.dp)            .clickable { 
+                // Only allow expanding past appointments that have medical details
+                // Exclude personal notes as they are not to be shown to the patient
+                if (isPast && (appointment?.diagnosis != null || 
+                               appointment?.plan != null ||
+                               appointment?.prescription != null)) {
+                    isExpanded = !isExpanded
+                }
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isPast) 
@@ -554,6 +571,133 @@ fun AppointmentCard(
                             )
                         }
                     }
+                    
+                    // Medical details section for past appointments
+                    if (isPast && appointment != null) {
+                        // Debug logging to check appointment data
+                        Log.d("AppointmentCard", "Appointment ID: ${appointment.id}")
+                        Log.d("AppointmentCard", "Diagnosis: ${appointment.diagnosis}")
+                        Log.d("AppointmentCard", "Plan: ${appointment.plan}")
+                        Log.d("AppointmentCard", "Notes: ${appointment.personalNotes}")
+                        Log.d("AppointmentCard", "Prescription: ${appointment.prescription}")
+                        
+                        val hasMedicalDetails = appointment.diagnosis != null || 
+                                              appointment.personalNotes != null || 
+                                              appointment.plan != null ||
+                                              appointment.prescription != null
+                        
+                        if (hasMedicalDetails) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Spacer(modifier = Modifier.height(12.dp))
+                              // Indicator to show there's more content
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isExpanded) "Hide medical details" else "Show medical details",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            
+                            // Show available info types
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(                                    text = buildString {
+                                        val infoTypes = mutableListOf<String>()
+                                        if (appointment.diagnosis != null) infoTypes.add("Diagnosis")
+                                        if (appointment.plan != null) infoTypes.add("Treatment Plan")
+                                        if (appointment.prescription != null) infoTypes.add("Prescription")
+                                        
+                                        append(infoTypes.joinToString(", "))
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            // Expandable medical details
+                            if (isExpanded) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                  // Diagnosis section
+                                appointment.diagnosis?.let { diagnosis -> 
+                                    MedicalDetailItem(
+                                        title = "Diagnosis",
+                                        content = diagnosis,
+                                        iconTint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                                
+                                // Treatment plan section
+                                appointment.plan?.let { plan -> 
+                                    MedicalDetailItem(
+                                        title = "Treatment Plan",
+                                        content = plan,
+                                        iconTint = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                                
+                                // Prescription section
+                                appointment.prescription?.let { prescription ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                                        shape = MaterialTheme.shapes.small,
+                                        border = BorderStroke(
+                                            width = 0.5.dp,
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.MedicalServices,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(20.dp),
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Prescription",
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                            
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            
+                                            Text(
+                                                text = prescription,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(start = 28.dp) // Align with the text above
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
@@ -735,8 +879,7 @@ fun ScheduleAppointmentDialog(
                             for (i in 0..4) {
                                 val date = today.plusDays(i.toLong())
                                 val isSelected = date == selectedDate
-                                
-                                Surface(
+                                  Surface(
                                     modifier = Modifier.weight(1f),
                                     shape = MaterialTheme.shapes.small,
                                     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
@@ -745,23 +888,27 @@ fun ScheduleAppointmentDialog(
                                         width = 1.dp,
                                         color = if (isSelected) MaterialTheme.colorScheme.primary 
                                                else MaterialTheme.colorScheme.outline
-                                    ),
-                                    onClick = { onDateSelected(date) }
+                                    )
                                 ) {
-                                    Column(
+                                    Box(
                                         modifier = Modifier
-                                            .padding(8.dp)
-                                            .fillMaxWidth(),
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                            .fillMaxWidth()
+                                            .clickable { onDateSelected(date) }
+                                            .padding(8.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = date.dayOfWeek.toString().take(3),
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        Text(
-                                            text = date.dayOfMonth.toString(),
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = date.dayOfWeek.toString().take(3),
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
+                                            Text(
+                                                text = date.dayOfMonth.toString(),
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -783,7 +930,7 @@ fun ScheduleAppointmentDialog(
                               
                             // Add refresh button to allow manual refresh of doctor availability
                             IconButton(onClick = {
-                                selectedDoctor?.id?.let { doctorId ->
+                                selectedDoctor?.id?.let { doctorId -> 
                                     Log.d("AppointmentScreen", "Manually refreshing doctor time slots")
                                     // Directly call the refreshed endpoint
                                     onDateSelected(selectedDate) // This will trigger the time slot fetch
@@ -828,8 +975,7 @@ fun ScheduleAppointmentDialog(
                                     // Each time slot is a 30-minute block (validated in backend)
                                     currentPageSlots.forEach { time -> 
                                         val isSelected = time == selectedTime
-                                        
-                                        Surface(
+                                          Surface(
                                             shape = MaterialTheme.shapes.small,
                                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
                                                     else MaterialTheme.colorScheme.surface,
@@ -837,20 +983,24 @@ fun ScheduleAppointmentDialog(
                                                 width = 1.dp,
                                                 color = if (isSelected) MaterialTheme.colorScheme.primary 
                                                     else MaterialTheme.colorScheme.outline
-                                            ),
-                                            onClick = { 
-                                                onTimeSelected(time) 
-                                                Log.d("AppointmentScreen", "Selected time slot: $time")
-                                            }
-                                        ) {
-                                            Text(
-                                                text = time,
-                                                modifier = Modifier.padding(
-                                                    horizontal = 12.dp,
-                                                    vertical = 8.dp
-                                                ),
-                                                style = MaterialTheme.typography.bodyMedium
                                             )
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clickable { 
+                                                        onTimeSelected(time) 
+                                                        Log.d("AppointmentScreen", "Selected time slot: $time")
+                                                    }
+                                            ) {
+                                                Text(
+                                                    text = time,
+                                                    modifier = Modifier.padding(
+                                                        horizontal = 12.dp,
+                                                        vertical = 8.dp
+                                                    ),
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -944,7 +1094,7 @@ fun ScheduleAppointmentDialog(
                                         expanded = isReasonDropdownExpanded,
                                         onDismissRequest = { isReasonDropdownExpanded = false }
                                     ) {
-                                        commonReasons.forEach { reason ->
+                                        commonReasons.forEach { reason -> 
                                             DropdownMenuItem(
                                                 text = { Text(reason) },
                                                 onClick = {
@@ -1084,17 +1234,16 @@ fun DoctorSelectionItem(
     doctor: Doctor,
     isSelected: Boolean,
     onClick: () -> Unit
-) {
-    Surface(
+) {    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                else MaterialTheme.colorScheme.surface,
-        onClick = onClick
+                else MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(onClick = onClick)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1271,6 +1420,60 @@ fun FlowRow(
                 
                 y += rowHeight + 8 // Add vertical spacing between rows
             }
+        }
+    }
+}
+
+/**
+ * Composable to display a single medical detail item with an icon
+ */
+@Composable
+fun MedicalDetailItem(
+    title: String,
+    content: String,
+    iconTint: Color
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {                Icon(
+                    imageVector = when (title) {
+                        "Diagnosis" -> Icons.Default.LocalHospital
+                        "Treatment Plan" -> Icons.Default.HealthAndSafety
+                        "Prescription" -> Icons.Default.MedicalServices
+                        else -> Icons.Default.Notes
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = iconTint
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = iconTint
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 28.dp) // Align with the text above
+            )
         }
     }
 }

@@ -38,8 +38,7 @@ fun PulmoCareApp() {
 
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-
+    val scope = rememberCoroutineScope()    
     val items = listOf(
         Screen.Dashboard,
         Screen.Appointments,
@@ -241,13 +240,50 @@ fun PulmoCareApp() {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         }
-                    } else {                            DashboardScreen(
-                        onNavigateToAppointments = { navController.navigate(Screen.Appointments.route) },
-                        onNavigateToDoctors = { navController.navigate(Screen.Doctors.route) },
-                        onNavigateToMedicalInfo = { navController.navigate(Screen.MedicalInfo.route) },
-                        onNavigateToMedicalReports = { navController.navigate(Screen.MedicalReports.route) },
-                        onNavigateToAIAssessment = { navController.navigate(Screen.AIAssessment.route) },
-                        onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
+                    } else {                            
+                        DashboardScreen(
+                        onNavigateToAppointments = { 
+                            navController.navigate(Screen.Appointments.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToDoctors = { 
+                            navController.navigate(Screen.Doctors.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToMedicalInfo = { 
+                            navController.navigate(Screen.MedicalInfo.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToMedicalReports = { 
+                            navController.navigate(Screen.MedicalReports.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToAIAssessment = { 
+                            navController.navigate(Screen.AIAssessment.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToProfile = { 
+                            navController.navigate(Screen.Profile.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         patientId = currentPatientId
                     )
                     }
@@ -272,12 +308,17 @@ fun PulmoCareApp() {
                             navController.navigate(Screen.Login.route) {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
-                        }
-                    } else {
+                        }                    } else {
                         DoctorsScreen(
                             onBookAppointment = { doctorId ->
                                 // Navigate to appointment booking screen with doctor ID
-                                navController.navigate(Screen.Appointments.route)
+                                navController.navigate(Screen.Appointments.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         )
                     }
@@ -293,7 +334,31 @@ fun PulmoCareApp() {
                     } else {
                         MedicalInfoScreen(
                             onNavigateToMedicalReports = {
-                                navController.navigate(Screen.MedicalReports.route)
+                                navController.navigate(Screen.MedicalReports.route) {
+                                    popUpTo(Screen.MedicalInfo.route) { saveState = true }
+                                }
+                            },
+                            onNavigateToXrayAnalysis = {
+                                navController.navigate(Screen.XrayAnalysis.route) {
+                                    popUpTo(Screen.MedicalInfo.route) { saveState = true }
+                                }
+                            }
+                        )
+                    }
+                }
+
+                composable(Screen.XrayAnalysis.route) {
+                    // Redirect to login if not authenticated
+                    if (!isLoggedIn) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        }
+                    } else {
+                        XrayAnalysisScreen(
+                            onNavigateBack = {
+                                navController.navigateUp()
                             }
                         )
                     }
@@ -362,6 +427,7 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
     object Doctors : Screen("doctors", "Doctors", Icons.Default.MedicalServices)
     object MedicalInfo : Screen("medical_info", "Medical Info", Icons.Default.HealthAndSafety)
     object MedicalReports : Screen("medical_reports", "Medical Reports", Icons.Default.Description)
+    object XrayAnalysis : Screen("xray_analysis", "X-ray Analysis", Icons.Default.Image)
     object AIAssessment : Screen("ai_assessment", "AI Assessment", Icons.Default.Psychology)
     object Profile : Screen("profile", "Profile", Icons.Default.Person)
 }
