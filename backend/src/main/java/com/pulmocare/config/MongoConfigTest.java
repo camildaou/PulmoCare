@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Configuration;
 public class MongoConfigTest {
 
     @Bean
-    CommandLineRunner mongoConnectionDebug(@Value("mongodb+srv://PulmoCare_Enterprise:Pulmocare123!@pulmocaredb.fqnihof.mongodb.net/") String mongoUri,
-                                          @Value("PulmoCareDB") String mongoDatabase) {
+    CommandLineRunner mongoConnectionDebug(@Value("${spring.data.mongodb.uri}") String mongoUri,
+                                          @Value("${spring.data.mongodb.database}") String mongoDatabase) {
         return args -> {
             System.out.println("\n=============================================");
             System.out.println("MongoDB Connection Test");
