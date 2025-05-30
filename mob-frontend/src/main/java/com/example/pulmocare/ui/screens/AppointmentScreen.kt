@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import coil.compose.AsyncImage
 import com.example.pulmocare.data.repository.AppointmentRepository
 import com.example.pulmocare.data.model.Doctor
+import com.example.pulmocare.data.model.Appointment
 import com.example.pulmocare.data.repository.DoctorRepository
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -203,17 +204,17 @@ fun AppointmentScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text("No upcoming appointments. Schedule one now!")
-                        }
-                    } else {                        LazyColumn(
+                        }                    } else {                        LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(upcomingAppointments) { appointment -> 
+                                // Use utility functions to safely get data from appointment
                                 AppointmentCard(
-                                    doctorName = appointment.doctor?.getFullName() ?: "Unknown Doctor",
-                                    specialty = appointment.doctor?.specialization ?: "",
+                                    doctorName = getSafeDoctorName(appointment),
+                                    specialty = getSafeSpecialty(appointment),
                                     date = appointment.date,
                                     time = appointment.hour,
-                                    location = appointment.location,
+                                    location = appointment.location ?: "",
                                     onCancel = {
                                         // Show cancel confirmation dialog
                                         appointment.id?.let {
@@ -228,32 +229,35 @@ fun AppointmentScreen() {
                     }
                 }
                 1 -> {
-                    // Past appointments
-                    if (pastAppointments.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No past appointments.")
-                        }
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {                            items(pastAppointments) { appointment -> 
-                                AppointmentCard(
-                                    doctorName = appointment.doctor?.getFullName() ?: "Unknown Doctor",
-                                    specialty = appointment.doctor?.specialization ?: "",
-                                    date = appointment.date,
-                                    time = appointment.hour,
-                                    location = appointment.location,
-                                    isPast = true,
-                                    appointment = appointment
-                                )
+                    run {                   //Past appointments
+                        if (pastAppointments.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No past appointments.")
+                            }
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(pastAppointments) { appointment ->
+                                    // Use utility functions to safely get data from appointment
+                                    AppointmentCard(
+                                        doctorName = getSafeDoctorName(appointment),
+                                        specialty = getSafeSpecialty(appointment),
+                                        date = appointment.date,
+                                        time = appointment.hour,
+                                        location = appointment.location ?: "",
+                                        isPast = true,
+                                        appointment = appointment
+                                    )
+                                }
                             }
                         }
                     }
-                }
             }
+        }
         }
     }
 
@@ -365,21 +369,35 @@ fun AppointmentCard(
     location: String,
     isPast: Boolean = false,
     onCancel: (() -> Unit)? = null,
-    appointment: com.example.pulmocare.data.model.Appointment? = null
+    appointment: Appointment? = null
 ) {
     val context = LocalContext.current
     var isExpanded by remember { mutableStateOf(false) }
-    
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp)            .clickable { 
-                // Only allow expanding past appointments that have medical details
-                // Exclude personal notes as they are not to be shown to the patient
-                if (isPast && (appointment?.diagnosis != null || 
-                               appointment?.plan != null ||
-                               appointment?.prescription != null)) {
-                    isExpanded = !isExpanded
+                // Check if appointment has any medical details to show
+                if (appointment != null) {
+                    // Safely check for null values with elvis operator
+                    val diagnosisExists = appointment.diagnosis?.isNotBlank() ?: false
+                    val planExists = appointment.plan?.isNotBlank() ?: false
+                    val prescriptionExists = appointment.prescription?.isNotBlank() ?: false
+                    
+                    val hasMedicalDetails = diagnosisExists || planExists || prescriptionExists
+                    
+                    // Only toggle expansion if there are medical details to show
+                    if (hasMedicalDetails) {
+                        isExpanded = !isExpanded
+                    } else if (isPast) {
+                        // Show a toast message for past appointments with no medical details
+                        Toast.makeText(context, "No medical details available for this appointment", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    // Handle null appointment case
+                    if (isPast) {
+                        Toast.makeText(context, "Appointment details unavailable", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -570,21 +588,21 @@ fun AppointmentCard(
                                     MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
-                    
-                    // Medical details section for past appointments
-                    if (isPast && appointment != null) {
+                    }            // Medical details section for any appointment with medical information
+                    if (appointment != null) {
                         // Debug logging to check appointment data
-                        Log.d("AppointmentCard", "Appointment ID: ${appointment.id}")
-                        Log.d("AppointmentCard", "Diagnosis: ${appointment.diagnosis}")
-                        Log.d("AppointmentCard", "Plan: ${appointment.plan}")
-                        Log.d("AppointmentCard", "Notes: ${appointment.personalNotes}")
-                        Log.d("AppointmentCard", "Prescription: ${appointment.prescription}")
+                        Log.d("AppointmentCard", "Appointment ID: ${appointment.id ?: "null"}")
+                        Log.d("AppointmentCard", "Diagnosis: ${appointment.diagnosis ?: "null"}")
+                        Log.d("AppointmentCard", "Plan: ${appointment.plan ?: "null"}")
+                        Log.d("AppointmentCard", "Notes: ${appointment.personalNotes ?: "null"}")
+                        Log.d("AppointmentCard", "Prescription: ${appointment.prescription ?: "null"}")
                         
-                        val hasMedicalDetails = appointment.diagnosis != null || 
-                                              appointment.personalNotes != null || 
-                                              appointment.plan != null ||
-                                              appointment.prescription != null
+                        // Safely check for null values with elvis operator
+                        val diagnosisExists = appointment.diagnosis?.isNotBlank() ?: false
+                        val planExists = appointment.plan?.isNotBlank() ?: false
+                        val prescriptionExists = appointment.prescription?.isNotBlank() ?: false
+                        
+                        val hasMedicalDetails = diagnosisExists || planExists || prescriptionExists
                         
                         if (hasMedicalDetails) {
                             Spacer(modifier = Modifier.height(12.dp))
@@ -616,45 +634,53 @@ fun AppointmentCard(
                                     .fillMaxWidth()
                                     .padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text(                                    text = buildString {
+                            ) {                                Text(                                    
+                                    text = buildString {
                                         val infoTypes = mutableListOf<String>()
-                                        if (appointment.diagnosis != null) infoTypes.add("Diagnosis")
-                                        if (appointment.plan != null) infoTypes.add("Treatment Plan")
-                                        if (appointment.prescription != null) infoTypes.add("Prescription")
+                                        // Safely check for null values with elvis operator
+                                        if (appointment.diagnosis?.isNotBlank() == true) infoTypes.add("Diagnosis")
+                                        if (appointment.plan?.isNotBlank() == true) infoTypes.add("Treatment Plan")
+                                        if (appointment.prescription?.isNotBlank() == true) infoTypes.add("Prescription")
                                         
-                                        append(infoTypes.joinToString(", "))
+                                        if (infoTypes.isEmpty()) {
+                                            append("No medical details")
+                                        } else {
+                                            append(infoTypes.joinToString(", "))
+                                        }
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            }
-                            
-                            // Expandable medical details
+                            }                              // Expandable medical details
                             if (isExpanded) {
                                 Spacer(modifier = Modifier.height(16.dp))
-                                  // Diagnosis section
-                                appointment.diagnosis?.let { diagnosis -> 
+                                
+                                // Handle safe display of medical details without try-catch
+                                // Log potential issues for debugging
+                                Log.d("AppointmentCard", "Showing medical details for appointment: ${appointment.id}")
+                                
+                                // Diagnosis section
+                                if (appointment.diagnosis?.isNotBlank() == true) { 
                                     MedicalDetailItem(
                                         title = "Diagnosis",
-                                        content = diagnosis,
+                                        content = appointment.diagnosis,
                                         iconTint = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
                                 
                                 // Treatment plan section
-                                appointment.plan?.let { plan -> 
+                                if (appointment.plan?.isNotBlank() == true) {
                                     MedicalDetailItem(
                                         title = "Treatment Plan",
-                                        content = plan,
+                                        content = appointment.plan,
                                         iconTint = MaterialTheme.colorScheme.tertiary
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
                                 
                                 // Prescription section
-                                appointment.prescription?.let { prescription ->
+                                if (appointment.prescription?.isNotBlank() == true) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
                                         shape = MaterialTheme.shapes.small,
@@ -688,7 +714,7 @@ fun AppointmentCard(
                                             Spacer(modifier = Modifier.height(8.dp))
                                             
                                             Text(
-                                                text = prescription,
+                                                text = appointment.prescription ?: "",
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.padding(start = 28.dp) // Align with the text above
                                             )
@@ -1495,4 +1521,49 @@ fun splitInto30MinuteSlots(timeSlots: List<Doctor.TimeSlot>): List<String> {
     // TimeSlot objects are already validated in the Doctor class to be 30-min slots
     // The validator ensures each time slot is exactly 30 minutes (endTime - startTime = 30min)
     return formattedSlots
+}
+
+/**
+ * Utility function to safely check if an appointment has medical details
+ * This helps prevent null pointer exceptions when checking appointment data
+ */
+fun hasMedicalDetails(appointment: Appointment?): Boolean {
+    if (appointment == null) return false
+    
+    return try {
+        val diagnosisExists = appointment.diagnosis?.isNotBlank() ?: false
+        val planExists = appointment.plan?.isNotBlank() ?: false
+        val prescriptionExists = appointment.prescription?.isNotBlank() ?: false
+        
+        diagnosisExists || planExists || prescriptionExists
+    } catch (e: Exception) {
+        Log.e("AppointmentScreen", "Error checking for medical details", e)
+        false
+    }
+}
+
+/**
+ * Utility function to safely get doctor name from an appointment
+ * This helps prevent null pointer exceptions when displaying doctor information
+ */
+fun getSafeDoctorName(appointment: Appointment?): String {
+    return try {
+        appointment?.doctor?.getFullName() ?: "Unknown Doctor"
+    } catch (e: Exception) {
+        Log.e("AppointmentScreen", "Error getting doctor name", e)
+        "Unknown Doctor"
+    }
+}
+
+/**
+ * Utility function to safely get doctor specialty from an appointment
+ * This helps prevent null pointer exceptions when displaying doctor specialty
+ */
+fun getSafeSpecialty(appointment: Appointment?): String {
+    return try {
+        appointment?.doctor?.specialization ?: ""
+    } catch (e: Exception) {
+        Log.e("AppointmentScreen", "Error getting doctor specialty", e)
+        ""
+    }
 }

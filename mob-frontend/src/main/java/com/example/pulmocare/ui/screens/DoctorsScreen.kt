@@ -1,5 +1,6 @@
 package com.example.pulmocare.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -34,6 +36,21 @@ fun DoctorsScreen(
     val error = remember { doctorRepository.error }
     var selectedDoctor by remember { mutableStateOf<Doctor?>(null) }
     val coroutineScope = rememberCoroutineScope()
+      // Search state
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+
+    // Filtered doctors based on search query
+    val filteredDoctors = remember(doctors, searchQuery) {
+        if (searchQuery.isBlank()) {
+            doctors
+        } else {
+            doctors.filter { doctor ->
+                doctor.name.contains(searchQuery, ignoreCase = true) ||
+                doctor.location.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
 
     // Fetch doctors when the screen is first displayed
     LaunchedEffect(key1 = true) {
@@ -119,34 +136,81 @@ fun DoctorsScreen(
                         }
                     }
                     else -> {
-                        // Show doctors list
-                        LazyColumn(
+                        // Show doctors list with search and filters
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                                .padding(16.dp)
                         ) {
-                            item {
-                                Text(
-                                    text = "Our Specialists",
-                                    style = MaterialTheme.typography.headlineMedium
-                                )
+                            Text(
+                                text = "Our Specialists",
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Find the right specialist for your respiratory health needs",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
 
-                                Text(
-                                    text = "Find the right specialist for your respiratory health needs",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                              // Search bar
+                            SearchBar(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                placeholder = { Text("Search doctors by name or location") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                active = isSearchActive,
+                                onSearch = { isSearchActive = false },
+                                onActiveChange = { isSearchActive = it }
+                            ) {
+                                // Search suggestions (empty for now)
                             }
-
-                            items(doctors) { doctor ->
-                                DoctorCard(
-                                    doctor = doctor,
-                                    onClick = { selectedDoctor = doctor }
-                                )
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Doctor cards - use LazyColumn for the scrolling list
+                            if (filteredDoctors.isEmpty() && searchQuery.isNotEmpty()) {
+                                // No results from search
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.SearchOff,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(64.dp),
+                                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            "No doctors found matching \"$searchQuery\"",
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Results list
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {                                    items(filteredDoctors) { doctor ->
+                                        DoctorCard(
+                                            doctor = doctor,
+                                            onClick = { selectedDoctor = doctor },
+                                            onBookAppointment = onBookAppointment
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -160,74 +224,124 @@ fun DoctorsScreen(
 @Composable
 fun DoctorCard(
     doctor: Doctor,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onBookAppointment: (String) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        onClick = onClick,
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = 4.dp
+        ),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = MaterialTheme.shapes.medium
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            AsyncImage(
-                model = doctor.image,
-                contentDescription = "Doctor's photo",
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = doctor.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
+                // Doctor Image with border
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = CircleShape
+                        )
+                        .padding(2.dp)
+                ) {
+                    AsyncImage(
+                        model = doctor.image,
+                        contentDescription = "Doctor's photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
 
-                Text(
-                    text = doctor.specialty,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {                    
+                    Text(
+                        text = doctor.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    // Specialty with pill background
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = doctor.specialty,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
 
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Location and availability in a row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Location
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
 
                     Spacer(modifier = Modifier.width(4.dp))
 
                     Text(
                         text = doctor.location,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 
-                // Show availability days
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // Availability days with pills
                 if (doctor.availability.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.weight(1f)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DateRange,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.secondary
                         )
                         
                         Spacer(modifier = Modifier.width(4.dp))
@@ -237,14 +351,14 @@ fun DoctorCard(
                         ) {
                             doctor.availability.take(3).forEach { day ->
                                 Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
                                     shape = MaterialTheme.shapes.extraSmall
                                 ) {
                                     Text(
                                         text = day,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
                             }
@@ -253,18 +367,35 @@ fun DoctorCard(
                                 Text(
                                     text = "+${doctor.availability.size - 3}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }
                     }
                 }
             }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "View details"
-            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+              // Book appointment button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = { onBookAppointment(doctor.id) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth, 
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Book Appointment")
+                }
+            }
         }
     }
 }
@@ -280,6 +411,7 @@ fun DoctorDetailScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Top app bar with back button
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -299,235 +431,380 @@ fun DoctorDetailScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Card(
+        // Main content in a scrollable column
+        LazyColumn(
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AsyncImage(
-                    model = doctor.image,
-                    contentDescription = "Doctor's photo",
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = doctor.name,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-
-                Text(
-                    text = doctor.specialty,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Divider()
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
+            item {
+                // Hero section with doctor image and name
+                ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                     )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Column {
-                        Text(
-                            text = "Location",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-
-                        Text(
-                            text = doctor.location,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Phone,
-                        contentDescription = null
-                    )
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Doctor image with border
+                        Box(
+                            modifier = Modifier
+                                .size(140.dp)
+                                .border(
+                                    width = 3.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                )
+                                .padding(3.dp)
+                        ) {
+                            AsyncImage(
+                                model = doctor.image,
+                                contentDescription = "Doctor's photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Column {
-                        Text(
-                            text = "Phone",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-
-                        Text(
-                            text = doctor.phone,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = null
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Column {
-                        Text(
-                            text = "Email",
-                            style = MaterialTheme.typography.titleSmall
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
-                            text = doctor.email,
-                            style = MaterialTheme.typography.bodyMedium
+                            text = doctor.name,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Divider()
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "About",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = doctor.bio,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Availability",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    doctor.availability.forEach { day ->
+                        // Specialty pill
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = MaterialTheme.shapes.small
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         ) {
                             Text(
-                                text = day,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                text = doctor.specialty,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                             )
                         }
                     }
                 }
                 
-                // Show available time slots if any
-                if (doctor.availableTimes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Text(
-                        text = "Available Time Slots",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.align(Alignment.Start)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Contact info section
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Group time slots by day
-                    doctor.availableTimes.entries.take(3).forEach { (day, slots) ->
-                        Column {
-                            Text(
-                                text = day.replaceFirstChar { it.uppercase() },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                              Spacer(modifier = Modifier.height(4.dp))
-                            
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Contact Information",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Location info
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
                             ) {
-                                items(slots.take(5)) { timeSlot ->
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        shape = MaterialTheme.shapes.small
-                                    ) {
-                                        Text(
-                                            text = timeSlot,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = "Clinic Location",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Text(
+                                    text = doctor.location,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        
+                        // Phone info
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = "Phone Number",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Text(
+                                    text = doctor.phone,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        
+                        // Email info
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = "Email Address",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Text(
+                                    text = doctor.email,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // About section
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "About",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = doctor.bio,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Availability section
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Text(
+                                text = "Available Days",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Days chips
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(doctor.availability) { day ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        text = day,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
+                            }
+                        }
+                        
+                        // Show available time slots if any
+                        if (doctor.availableTimes.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
                                 
-                                if (slots.size > 5) {
-                                    item {
-                                        Text(
-                                            text = "+${slots.size - 5} more",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(vertical = 4.dp)
-                                        )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = "Available Time Slots",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // Group time slots by day
+                            doctor.availableTimes.entries.take(3).forEach { (day, slots) ->
+                                Column(
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                ) {
+                                    Text(
+                                        text = day.replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(slots.take(5)) { timeSlot ->
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                                shape = MaterialTheme.shapes.small
+                                            ) {
+                                                Text(
+                                                    text = timeSlot,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                        
+                                        if (slots.size > 5) {
+                                            item {                                                Text(
+                                                    text = "+${slots.size - 5} more",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.secondary,
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(8.dp))
+                            if (doctor.availableTimes.size > 3) {
+                                Text(
+                                    text = "... and ${doctor.availableTimes.size - 3} more days",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
                     }
-                    
-                    if (doctor.availableTimes.size > 3) {
-                        Text(
-                            text = "... and ${doctor.availableTimes.size - 3} more days",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
-
+                
                 Spacer(modifier = Modifier.height(24.dp))
-
+                
+                // Book appointment button
                 Button(
                     onClick = onBookAppointment,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.CalendarMonth,
@@ -536,8 +813,14 @@ fun DoctorDetailScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Text("Book Appointment")
+                    Text(
+                        text = "Book Appointment",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
+                
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
